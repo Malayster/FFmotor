@@ -1,0 +1,23 @@
+{
+  "name": "ffmotor",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev:api": "pnpm --filter @ffmotor/api dev",
+    "dev:web": "pnpm --filter @ffmotor/web dev",
+    "build": "pnpm --recursive build",
+    "db:generate": "pnpm --filter @ffmotor/db db:generate",
+    "db:migrate": "pnpm --filter @ffmotor/db db:migrate"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3",
+    "wrangler": "^3.109.2"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "workerd",
+      "sharp"
+    ]
+  }
+}
