@@ -1,6 +1,8 @@
 import React, { useState } from "react";
-import { Wrench, Plus, Video, CheckCircle, Clock, AlertCircle, DollarSign, Eye, ShieldCheck, Share2, Upload } from "lucide-react";
+import { Wrench, Plus, Video, CheckCircle, Clock, AlertCircle, DollarSign, Eye, ShieldCheck, Share2, Upload, Printer, MessageSquare } from "lucide-react";
 import { WorkOrder, Product, Vehicle } from "../types";
+import { createWhatsAppLink, WhatsAppTemplates } from "../lib/whatsapp";
+import { ThermalReceiptModal } from "../components/ui/ThermalReceiptModal";
 
 interface WorkOrdersProps {
   workOrders: WorkOrder[];
@@ -22,6 +24,8 @@ export const WorkOrders: React.FC<WorkOrdersProps> = ({
   const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
   const [isAddItemModalOpen, setIsAddItemModalOpen] = useState(false);
   const [isPayModalOpen, setIsPayModalOpen] = useState(false);
+  const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
+  const [receiptType, setReceiptType] = useState<"jobcard" | "receipt">("jobcard");
 
   // Form states
   const [newPlate, setNewPlate] = useState("");
@@ -182,10 +186,31 @@ export const WorkOrders: React.FC<WorkOrdersProps> = ({
       });
       setIsPayModalOpen(false);
       onRefresh();
-      alert(`Bayaran RM ${(selectedWO.grandTotal || 0).toFixed(2)} berjaya diterima via ${payMethod}. Resit telah disimpan di R2.`);
+      // Buka modal cetak resit bayaran serta merta
+      setReceiptType("receipt");
+      setIsReceiptModalOpen(true);
     } catch (err) {
       alert("Ralat memproses bayaran: " + err);
     }
+  };
+
+  const handleSendWhatsApp = (wo: WorkOrder, kind: "video" | "ready") => {
+    const currentHost = typeof window !== "undefined" ? window.location.origin : "http://localhost:3000";
+    const trackUrl = `${currentHost}/#track-${wo.approvalToken}`;
+    const passportUrl = `${currentHost}/#passport-${wo.plateNumber?.replace(/\s+/g, "")}`;
+
+    const msg = kind === "video"
+      ? WhatsAppTemplates.videoProof(wo.ownerName || "Pelanggan", wo.plateNumber || "", wo.grandTotal || 0, trackUrl)
+      : WhatsAppTemplates.motorReady(wo.ownerName || "Pelanggan", wo.plateNumber || "", wo.grandTotal || 0, passportUrl);
+
+    const link = createWhatsAppLink(wo.ownerPhone || "0123456789", msg);
+    window.open(link, "_blank");
+  };
+
+  const handleOpenPrint = (wo: WorkOrder, type: "jobcard" | "receipt") => {
+    setSelectedWO(wo);
+    setReceiptType(type);
+    setIsReceiptModalOpen(true);
   };
 
   const columns = [
@@ -296,6 +321,24 @@ export const WorkOrders: React.FC<WorkOrdersProps> = ({
                       >
                         <Share2 className="w-3 h-3" />
                         <span>Link Customer</span>
+                      </button>
+
+                      <button
+                        onClick={() => handleOpenPrint(wo, wo.paymentStatus === "paid" ? "receipt" : "jobcard")}
+                        className="text-[11px] font-bold px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 flex items-center space-x-1"
+                        title="Cetak Slip 80mm"
+                      >
+                        <Printer className="w-3 h-3 text-slate-400" />
+                        <span>Slip</span>
+                      </button>
+
+                      <button
+                        onClick={() => handleSendWhatsApp(wo, wo.status === "ready" ? "ready" : "video")}
+                        className="text-[11px] font-bold px-2 py-1 rounded bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 border border-emerald-500/30 flex items-center space-x-1"
+                        title="Hantar Mesej WhatsApp"
+                      >
+                        <MessageSquare className="w-3 h-3" />
+                        <span>WhatsApp</span>
                       </button>
 
                       {/* Status Next Button */}
@@ -673,6 +716,16 @@ export const WorkOrders: React.FC<WorkOrdersProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {/* MODAL 5: CETAK SLIP / RESIT TERMAL (80mm) */}
+      {selectedWO && (
+        <ThermalReceiptModal
+          isOpen={isReceiptModalOpen}
+          onClose={() => setIsReceiptModalOpen(false)}
+          workOrder={selectedWO}
+          type={receiptType}
+        />
       )}
     </div>
   );

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
-import { Users, Plus, Sparkles, Phone, MessageSquare, Calendar, ChevronRight, CheckCircle2, Clock, Wrench } from "lucide-react";
+import { Users, Plus, Sparkles, MessageSquare, ExternalLink } from "lucide-react";
 import { Lead, PredictiveBooking } from "../types";
+import { createWhatsAppLink } from "../lib/whatsapp";
 
 interface LeadsProps {
   leads: Lead[];
@@ -142,14 +143,25 @@ export const Leads: React.FC<LeadsProps> = ({ leads, onRefresh }) => {
                 </div>
               </div>
 
-              {/* Action */}
-              <button
-                onClick={() => handleCopyWhatsApp(fc.whatsappMessageContent)}
-                className="w-full py-2.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-300 font-extrabold text-xs flex items-center justify-center space-x-2 transition-all"
-              >
-                <MessageSquare className="w-4 h-4" />
-                <span>Salin Mesej Peringatan WhatsApp</span>
-              </button>
+              {/* Actions */}
+              <div className="grid grid-cols-2 gap-2">
+                <a
+                  href={createWhatsAppLink(fc.ownerPhone, fc.whatsappMessageContent || "")}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-extrabold text-xs flex items-center justify-center space-x-1.5 shadow-lg shadow-emerald-500/20 transition-all"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  <span>Buka WhatsApp</span>
+                </a>
+                <button
+                  onClick={() => handleCopyWhatsApp(fc.whatsappMessageContent)}
+                  className="py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 font-bold text-xs flex items-center justify-center space-x-1.5 transition-all"
+                >
+                  <MessageSquare className="w-3.5 h-3.5" />
+                  <span>Salin Teks</span>
+                </button>
+              </div>
             </div>
           ))}
         </div>
