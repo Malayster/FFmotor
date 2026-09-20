@@ -177,3 +177,4 @@ export const Passport: React.FC<PassportProps> = ({ plate, onBack }) => {
     </div>
   );
 };
+

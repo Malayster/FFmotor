@@ -94,3 +94,4 @@ vehiclesRouter.post("/", async (c) => {
 
   return c.json({ success: true, vehicle: newVehicle }, 201);
 });
+

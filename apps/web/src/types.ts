@@ -117,3 +117,4 @@ export interface PredictiveBooking {
   reservedProductStock?: number;
   reservedProductRack?: string;
 }
+

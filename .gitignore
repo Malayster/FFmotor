@@ -1,6 +1,7 @@
 node_modules
 dist
 .wrangler
+.wrangler_home
 .env
 .DS_Store
 *.local

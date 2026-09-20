@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "main": "./src/index.ts",
   "scripts": {
-    "dev": "wrangler dev",
+    "dev": "XDG_CONFIG_HOME=../../.wrangler_home wrangler dev --port 8787 --ip 0.0.0.0 --inspector-port 0",
     "deploy": "wrangler deploy"
   },
   "dependencies": {

@@ -60,3 +60,4 @@ export default {
     ctx.waitUntil(runPredictiveMileageCron(db));
   },
 };
+

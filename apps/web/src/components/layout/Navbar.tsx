@@ -116,3 +116,4 @@ export const Navbar: React.FC<NavbarProps> = ({
     </header>
   );
 };
+

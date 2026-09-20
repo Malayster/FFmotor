@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
+    "dev": "concurrently -n \"API,WEB\" -c \"magenta,cyan\" \"pnpm dev:api\" \"pnpm dev:web\"",
     "dev:api": "pnpm --filter @ffmotor/api dev",
     "dev:web": "pnpm --filter @ffmotor/web dev",
     "build": "pnpm --recursive build",
@@ -10,6 +11,7 @@
     "db:migrate": "pnpm --filter @ffmotor/db db:migrate"
   },
   "devDependencies": {
+    "concurrently": "^10.0.5",
     "typescript": "^5.7.3",
     "wrangler": "^3.109.2"
   },

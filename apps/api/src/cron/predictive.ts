@@ -57,3 +57,4 @@ export async function runPredictiveMileageCron(db: DbClient) {
 
   return { success: true, processedCount: allVehicles.length };
 }
+

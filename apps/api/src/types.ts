@@ -11,3 +11,4 @@ export type Variables = {
     role: "admin" | "cashier" | "mechanic" | "sales";
   };
 };
+

@@ -42,3 +42,4 @@ authRouter.get("/users", async (c) => {
   }).from(users).all();
   return c.json({ success: true, users: allUsers });
 });
+

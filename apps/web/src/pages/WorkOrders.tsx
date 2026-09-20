@@ -677,3 +677,4 @@ export const WorkOrders: React.FC<WorkOrdersProps> = ({
     </div>
   );
 };
+

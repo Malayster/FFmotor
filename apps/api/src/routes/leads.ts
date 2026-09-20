@@ -101,3 +101,4 @@ leadsRouter.get("/predictive-forecasts", async (c) => {
 
   return c.json({ success: true, forecasts: list });
 });
+

@@ -305,3 +305,4 @@ export const Leads: React.FC<LeadsProps> = ({ leads, onRefresh }) => {
     </div>
   );
 };
+

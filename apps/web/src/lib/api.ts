@@ -19,3 +19,4 @@ export async function fetchApi<T>(endpoint: string, options?: RequestInit): Prom
     throw error;
   }
 }
+

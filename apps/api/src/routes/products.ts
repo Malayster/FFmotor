@@ -125,3 +125,4 @@ productsRouter.post("/:id/serials", async (c) => {
 
   return c.json({ success: true, serial: newSerial }, 201);
 });
+
