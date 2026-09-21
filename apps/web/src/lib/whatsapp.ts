@@ -44,3 +44,4 @@ export const WhatsAppTemplates = {
     `Salam Bro ${ownerName}, mengikut kiraan purata perbatuan harian anda di *FFmotor*, komponen *${component.toUpperCase()}* bagi motor ${model} (${plateNumber}) dijangka sampai had servis sekitar *${dueDate}*.\n\n` +
     `Kami telah simpankan 1 unit stok original siap-siap di rak kami. Balas *BOOK* untuk tetapkan masa servis anda. Terima kasih!`,
 };
+
