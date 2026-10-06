@@ -116,6 +116,7 @@ export const ROLE_TABS: Record<string, string[]> = {
     "work-orders",
     "dashboard",
     "owner-desk",
+    "loan-pipeline",
   ],
   kerani_1: [
     "express-intake",
@@ -126,6 +127,7 @@ export const ROLE_TABS: Record<string, string[]> = {
     "crm",
     "inbox",
     "leads",
+    "loan-pipeline",
     "dashboard",
   ],
   kerani_2: [

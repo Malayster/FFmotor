@@ -139,7 +139,16 @@ export const KeraniMeja: React.FC<{ mode: "kaunter" | "stor" }> = ({ mode }) => 
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5 shrink-0">
+        <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+          {mode === "kaunter" && (
+            <a
+              href="#loan-pipeline"
+              className="px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white transition flex items-center gap-2 text-xs font-black cursor-pointer shadow-sm active:scale-95 no-underline"
+            >
+              <CreditCard className="w-3.5 h-3.5 text-white" />
+              <span>Saluran Pinjaman (Loan)</span>
+            </a>
+          )}
           <button 
             type="button"
             onClick={() => {

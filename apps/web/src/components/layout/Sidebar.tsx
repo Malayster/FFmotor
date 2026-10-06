@@ -136,6 +136,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         { id: "work-orders", label: "Kad Kerja Servis", icon: Wrench, badge: "Servis" },
         { id: "pos-checkout", label: "Kasir POS & Bayaran", icon: ShoppingCart, badge: "Bayar" },
         { id: "quotations", label: "Sebut Harga Rasmi", icon: FileText, badge: "Harga" },
+        { id: "loan-pipeline", label: "Permohonan Pinjaman (Loan)", icon: Calculator, badge: "Loan" },
       ],
     },
     {
