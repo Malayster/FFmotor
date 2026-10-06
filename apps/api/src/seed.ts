@@ -24,6 +24,7 @@ import {
   loanApplications,
   variationOrders,
   itemShots,
+  customerAccess,
 } from "@ffmotor/db";
 
 async function safeInsertRows(db: DbClient, table: any, rows: any[]) {
@@ -916,6 +917,47 @@ export async function seedInitialData(db: DbClient) {
       customerPhone: "0178899001",
       approvedAt: now,
       customerNotes: "Luluskan tukar, utamakan keselamatan jalan raya",
+      createdAt: now,
+    },
+  ]);
+}
+
+export async function seedCustomerPins(db: DbClient) {
+  const now = new Date().toISOString();
+  try {
+    await (db as any).$client?.prepare?.(`CREATE TABLE IF NOT EXISTS customer_access (
+      id text PRIMARY KEY NOT NULL,
+      phone text NOT NULL,
+      pin_code text NOT NULL,
+      name text NOT NULL,
+      is_active integer NOT NULL DEFAULT 1,
+      created_at text NOT NULL
+    )`).run?.();
+    await (db as any).$client?.prepare?.(`CREATE TABLE IF NOT EXISTS customer_sessions (
+      token text PRIMARY KEY NOT NULL,
+      customer_id text NOT NULL,
+      expires_at text NOT NULL,
+      created_at text NOT NULL
+    )`).run?.();
+  } catch {
+    // Tables may already exist
+  }
+
+  await safeInsertRows(db, customerAccess, [
+    {
+      id: "cust_acc_1",
+      phone: "0192233445",
+      pinCode: "1234",
+      name: "Akmal Hakim",
+      isActive: true,
+      createdAt: now,
+    },
+    {
+      id: "cust_acc_2",
+      phone: "0178899001",
+      pinCode: "4321",
+      name: "Faizal Roslan",
+      isActive: true,
       createdAt: now,
     },
   ]);

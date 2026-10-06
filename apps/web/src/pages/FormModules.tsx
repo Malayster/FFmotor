@@ -17,9 +17,9 @@ async function send(endpoint: string, body: Record<string, unknown>): Promise<Re
 }
 
 const Field = ({ label, value, set, type = "text" }: { label: string; value: string; set: (v: string) => void; type?: string }) => (
-  <label className="block text-xs font-bold text-zinc-800">
+  <label className="block text-xs font-bold text-zinc-950">
     {label}
-    <input className="mt-1 w-full rounded-xl border-2 border-zinc-300 px-3 py-2 text-sm" type={type} value={value} onChange={(e) => set(e.target.value)} required />
+    <input className="mt-1 w-full rounded-xl border-2 border-zinc-300 bg-white px-3 py-2 text-sm font-bold text-zinc-950 outline-none focus:border-zinc-950" type={type} value={value} onChange={(e) => set(e.target.value)} required />
   </label>
 );
 
