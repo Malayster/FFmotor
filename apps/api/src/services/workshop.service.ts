@@ -34,7 +34,7 @@ export class WorkshopService {
         ownerPhone: vehicles.ownerPhone,
       })
       .from(workOrders)
-      .innerJoin(vehicles, eq(workOrders.vehicleId, vehicles.id));
+      .leftJoin(vehicles, eq(workOrders.vehicleId, vehicles.id));
 
     const list = await query.orderBy(desc(workOrders.createdAt)).all();
 
@@ -46,6 +46,9 @@ export class WorkshopService {
       }
       return {
         ...item,
+        plateNumber: item.plateNumber || "TIADA PLAT",
+        ownerName: item.ownerName || "Pelanggan Walk-in",
+        ownerPhone: item.ownerPhone || "0123456789",
         assignedBay,
       };
     });
@@ -83,7 +86,7 @@ export class WorkshopService {
         ownerPhone: vehicles.ownerPhone,
       })
       .from(workOrders)
-      .innerJoin(vehicles, eq(workOrders.vehicleId, vehicles.id))
+      .leftJoin(vehicles, eq(workOrders.vehicleId, vehicles.id))
       .where(eq(workOrders.id, id))
       .all();
 

@@ -3,6 +3,7 @@ import { Sidebar } from "./components/layout/Sidebar";
 import { HeaderBar } from "./components/layout/HeaderBar";
 import { CanvasBackdrop } from "./components/canvas/CanvasBackdrop";
 import { useCanvasParallax } from "./lib/useCanvasParallax";
+import { sessionHeader } from "./lib/api";
 
 import { Dashboard } from "./pages/Dashboard";
 import { OwnerDashboard } from "./pages/dashboards/OwnerDashboard";
@@ -224,7 +225,9 @@ export const App: React.FC = () => {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
     try {
-      const headers: Record<string, string> = {};
+      const headers: Record<string, string> = {
+        ...sessionHeader(),
+      };
       if (currentUser?.id) {
         headers["x-ff-user-id"] = currentUser.id;
       }

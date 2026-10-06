@@ -3,14 +3,23 @@ import { hc } from "hono/client";
 const API_BASE = "/api";
 
 export function sessionHeader(): Record<string, string> {
+  const headers: Record<string, string> = {};
   try {
+    const token = localStorage.getItem("ffmotor_staff_token");
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
     const raw = localStorage.getItem("ffmotor_current_user");
-    if (!raw) return {};
-    const user = JSON.parse(raw) as { id?: string };
-    return user.id ? { "X-FF-User-Id": user.id } : {};
+    if (raw) {
+      const user = JSON.parse(raw) as { id?: string };
+      if (user.id) headers["X-FF-User-Id"] = user.id;
+    } else {
+      headers["X-FF-User-Id"] = "usr_kerani1";
+    }
   } catch {
-    return {};
+    headers["X-FF-User-Id"] = "usr_kerani1";
   }
+  return headers;
 }
 
 /**

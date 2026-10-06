@@ -28,6 +28,7 @@ import {
 import { WorkOrder, Product, Vehicle } from "../types";
 import { createWhatsAppLink, WhatsAppTemplates } from "../lib/whatsapp";
 import { ThermalReceiptModal } from "../components/ui/ThermalReceiptModal";
+import { sessionHeader } from "../lib/api";
 
 export interface StandardTask {
   id: string;
@@ -181,7 +182,7 @@ export const WorkOrders: React.FC<WorkOrdersProps> = ({
       } else {
         const resVeh = await fetch("/api/vehicles", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", ...sessionHeader() },
           body: JSON.stringify({
             plateNumber: newPlate,
             brand: "Yamaha",
@@ -192,13 +193,13 @@ export const WorkOrders: React.FC<WorkOrdersProps> = ({
           }),
         });
         const d = await resVeh.json();
-        vehId = d.vehicle.id;
+        vehId = d.vehicle?.id || d.id;
       }
 
       // 2. Create WO
-      await fetch("/api/work-orders", {
+      const resWO = await fetch("/api/work-orders", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...sessionHeader() },
         body: JSON.stringify({
           vehicleId: vehId,
           mechanicId: "usr_mech1",
@@ -225,7 +226,7 @@ export const WorkOrders: React.FC<WorkOrdersProps> = ({
     try {
       await fetch(`/api/work-orders/${id}/status`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...sessionHeader() },
         body: JSON.stringify({ status: newStatus }),
       });
       onRefresh();
@@ -253,7 +254,9 @@ export const WorkOrders: React.FC<WorkOrdersProps> = ({
   const fetchWoItems = async (woId: string) => {
     setIsLoadingWoItems(true);
     try {
-      const res = await fetch(`/api/work-orders/${woId}/items`);
+      const res = await fetch(`/api/work-orders/${woId}/items`, {
+        headers: sessionHeader(),
+      });
       const data = await res.json();
       if (data.success && data.items) {
         setSelectedWoItems(data.items);
@@ -272,7 +275,10 @@ export const WorkOrders: React.FC<WorkOrdersProps> = ({
     if (!selectedWO) return;
     if (!confirm("Adakah anda pasti ingin memadam item ini dari bil? Baki stok alat ganti akan dipulangkan ke rak.")) return;
     try {
-      const res = await fetch(`/api/work-orders/${selectedWO.id}/items/${itemId}`, { method: "DELETE" });
+      const res = await fetch(`/api/work-orders/${selectedWO.id}/items/${itemId}`, {
+        method: "DELETE",
+        headers: sessionHeader(),
+      });
       const data = await res.json();
       if (data.success) {
         await fetchWoItems(selectedWO.id);
@@ -321,7 +327,7 @@ export const WorkOrders: React.FC<WorkOrdersProps> = ({
     try {
       const res = await fetch(`/api/work-orders/${selectedWO.id}/items`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...sessionHeader() },
         body: JSON.stringify({
           itemType,
           productId: selectedProductId || null,
@@ -412,7 +418,7 @@ export const WorkOrders: React.FC<WorkOrdersProps> = ({
     try {
       await fetch(`/api/work-orders/${selectedWO.id}/pay`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...sessionHeader() },
         body: JSON.stringify({ paymentMethod: payMethod }),
       });
       setIsPayModalOpen(false);
@@ -460,7 +466,7 @@ export const WorkOrders: React.FC<WorkOrdersProps> = ({
       } else {
         const resVeh = await fetch("/api/vehicles", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", ...sessionHeader() },
           body: JSON.stringify({
             plateNumber: newPlate.toUpperCase().trim(),
             brand: "Yamaha",
@@ -471,12 +477,12 @@ export const WorkOrders: React.FC<WorkOrdersProps> = ({
           }),
         });
         const d = await resVeh.json();
-        vehId = d.vehicle?.id || "";
+        vehId = d.vehicle?.id || d.id || "";
       }
 
       const resWO = await fetch("/api/work-orders", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...sessionHeader() },
         body: JSON.stringify({
           vehicleId: vehId,
           mechanicId: "usr_mech1",

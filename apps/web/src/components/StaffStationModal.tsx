@@ -137,6 +137,9 @@ export const StaffStationModal: React.FC<StaffStationModalProps> = ({
       const data = await readJson(res);
       const remoteUser = data?.user as AuthenticatedUser | undefined;
       if (data?.success && remoteUser) {
+        if (typeof data.token === "string") {
+          localStorage.setItem("ffmotor_staff_token", data.token);
+        }
         onUserChange(remoteUser);
         setSuccessMsg(`Disahkan: Selamat bertugas, ${remoteUser.name}!`);
         setTimeout(() => onClose(), 800);
@@ -181,6 +184,9 @@ export const StaffStationModal: React.FC<StaffStationModalProps> = ({
       });
 
       const data = await readJson(res);
+      if (typeof data?.token === "string") {
+        localStorage.setItem("ffmotor_staff_token", data.token);
+      }
       const remoteUser = data?.user as AuthenticatedUser | undefined;
       const user = data?.success && remoteUser ? remoteUser : userFromPreset(account);
       onUserChange(user);

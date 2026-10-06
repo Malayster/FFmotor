@@ -34,6 +34,9 @@ export const StaffLogin: React.FC<StaffLoginProps> = ({ onSuccess, onBack }) => 
         setError(data?.message || "PIN tidak sah.");
         return;
       }
+      if (data.token) {
+        localStorage.setItem("ffmotor_staff_token", data.token);
+      }
       localStorage.setItem("ffmotor_current_user", JSON.stringify(data.user));
       localStorage.setItem("ffmotor_staff_session", "1");
       onSuccess();

@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { Vehicle } from "../types";
 import { normalizePlate } from "../utils/normalizePlate";
+import { sessionHeader } from "../lib/api";
 
 interface ExpressIntakeProps {
   vehicles: Vehicle[];
@@ -113,7 +114,10 @@ export const ExpressIntake: React.FC<ExpressIntakeProps> = ({
     try {
       const res = await fetch("/api/work-orders", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...sessionHeader(),
+        },
         body: JSON.stringify({
           plateNumber: plate,
           ownerName,
@@ -129,20 +133,24 @@ export const ExpressIntake: React.FC<ExpressIntakeProps> = ({
         }),
       });
 
-      const d = await res.json();
+      const d = await res.json().catch(() => ({}));
+      const createdWO = d.workOrder || d;
       const woData = {
-        woNumber: d.woNumber || `WO-2026-${Math.floor(1000 + Math.random() * 9000)}`,
+        woNumber: createdWO.woNumber || `WO-2026-${Math.floor(1000 + Math.random() * 9000)}`,
         plate,
         ownerName,
         ownerPhone,
         brand,
         model,
         bay: assignedBay,
-        token,
+        token: createdWO.approvalToken || token,
       };
 
       setGeneratedTicket(woData);
       setIntakeCompleted(true);
+      if (createdWO.id) {
+        onIntakeSuccess(createdWO.id, woData.token);
+      }
       onRefresh?.();
     } catch (err) {
       // Fallback
