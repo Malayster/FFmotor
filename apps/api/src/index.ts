@@ -5,12 +5,11 @@ import { cors } from "hono/cors";
 import { apiReference } from "@scalar/hono-api-reference";
 import { Bindings, Variables } from "./types";
 import { createDb } from "@ffmotor/db";
-import { seedInitialData } from "./seed";
+import { seedInitialData, seedCustomerPins } from "./seed";
 import { errorHandler } from "./middlewares/error";
 import { requireOwner, requireRole } from "./middlewares/guard";
 import { openApiSpec } from "./docs/openapi";
 
-// Import Routers
 import { authRouter } from "./routes/auth";
 import { vehiclesRouter } from "./routes/vehicles";
 import { workOrdersRouter } from "./routes/work-orders";
@@ -31,15 +30,13 @@ import { variationOrdersRouter } from "./routes/variation-orders";
 import { deskRouter, ownerRouter } from "./routes/owner";
 import { shotsRouter } from "./routes/shots";
 import { bagRouter, shopRouter } from "./routes/shop";
-import { resolveUser, normalizeRole } from "./authz";
+import { resolveUser } from "./authz";
 import { runPredictiveMileageCron } from "./cron/predictive";
 
 const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
-// 1. Global Error Handler Berpusat
 app.onError(errorHandler);
 
-// 2. CORS Kebangsaan untuk Web Frontend
 app.use(
   "*",
   cors({
@@ -49,7 +46,6 @@ app.use(
   })
 );
 
-// 3. User Session Context Hydration (Menyediakan sesi jika header dibekalkan)
 app.use("*", async (c, next) => {
   const user = await resolveUser(c);
   if (user) {
@@ -58,20 +54,16 @@ app.use("*", async (c, next) => {
   return next();
 });
 
-// 4. Scalar Interactive API Documentation (/api/docs & /api/openapi.json)
 app.get("/api/openapi.json", (c) => c.json(openApiSpec));
 app.get(
   "/api/docs",
   apiReference({
-    spec: {
-      url: "/api/openapi.json",
-    },
+    spec: { url: "/api/openapi.json" },
     theme: "elysiajs",
     pageTitle: "FFmotor Enterprise API Documentation",
   })
 );
 
-// 5. Health Check & Seed Data
 app.get("/api/health", (c) => {
   return c.json({
     status: "ok",
@@ -84,15 +76,14 @@ app.get("/api/health", (c) => {
 app.get("/api/seed", async (c) => {
   const db = createDb(c.env.DB);
   await seedInitialData(db);
+  await seedCustomerPins(db);
   return c.json({ success: true, message: "Data permulaan bengkel FFmotor berjaya dimasukkan!" });
 });
 
-// 6. Sambungan Sub-Routers
 publicRouter.route("/bag", bagRouter);
 deskRouter.route("/shots", shotsRouter);
 deskRouter.route("/shop", shopRouter);
 
-// 7. Komposit Route Penuh dengan Sokongan Type-Safe Hono RPC
 export const apiRoutes = app
   .route("/api/auth", authRouter)
   .route("/api/vehicles", vehiclesRouter)
@@ -114,10 +105,8 @@ export const apiRoutes = app
   .route("/api/owner", ownerRouter)
   .route("/api/desk", deskRouter);
 
-// Eksport jenis AppType untuk klien type-safe Hono RPC di frontend
 export type AppType = typeof apiRoutes;
 
-// Export Cloudflare Worker Handler
 export default {
   fetch: app.fetch,
   async scheduled(event: ScheduledEvent, env: Bindings, ctx: ExecutionContext) {

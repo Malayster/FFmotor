@@ -1,6 +1,6 @@
-import { eq } from "drizzle-orm";
 import { Context } from "hono";
-import { createDb, users } from "@ffmotor/db";
+import { createDb, users, staffSessions } from "@ffmotor/db";
+import { and, eq, gt } from "drizzle-orm";
 import { Bindings, Variables } from "./types";
 
 export type StaffSession = {
@@ -19,7 +19,7 @@ export function normalizeRole(role?: string | null): string {
   if (r === "stor" || r === "store" || r === "kerani2" || r === "kerani_2") return "kerani_2";
   if (r === "mechanic" || r === "mekanik" || r === "chief" || r === "foreman") return "foreman";
   if (r === "sales" || r === "ejen" || r === "affiliate") return "affiliate";
-  return r || "owner";
+  return r || "unknown";
 }
 
 const ZERO_TRUST_STAFF: Record<string, StaffSession> = {
@@ -74,25 +74,21 @@ const ZERO_TRUST_STAFF: Record<string, StaffSession> = {
 };
 
 export async function resolveUser(c: Context<{ Bindings: Bindings; Variables: Variables }>): Promise<StaffSession | null> {
-  const id = c.req.header("x-ff-user-id");
-  if (!id) return null;
+  const header = c.req.header("authorization") || "";
+  const token = header.toLowerCase().startsWith("bearer ") ? header.slice(7).trim() : "";
+  if (!token) return null;
   const db = createDb(c.env.DB);
-  const row = await db.select().from(users).where(eq(users.id, id)).get();
-  if (row && row.isActive) {
-    return {
-      id: row.id,
-      name: row.name,
-      email: row.email,
-      role: normalizeRole(row.role),
-      phone: row.phone,
-      photoUrl: row.photoUrl,
-    };
-  }
-
-  // Fallback pantas untuk peranan stesen Zero-Trust yang sah
-  if (ZERO_TRUST_STAFF[id]) {
-    return ZERO_TRUST_STAFF[id];
-  }
-
-  return null;
+  const now = new Date().toISOString();
+  const session = await db.select().from(staffSessions).where(and(eq(staffSessions.token, token), gt(staffSessions.expiresAt, now))).get();
+  if (!session) return null;
+  const row = await db.select().from(users).where(eq(users.id, session.userId)).get();
+  if (!row || !row.isActive) return null;
+  return {
+    id: row.id,
+    name: row.name,
+    email: row.email,
+    role: normalizeRole(row.role),
+    phone: row.phone,
+    photoUrl: row.photoUrl,
+  };
 }
