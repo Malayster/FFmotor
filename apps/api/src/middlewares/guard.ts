@@ -5,52 +5,43 @@ import { UnauthorizedError, ForbiddenError } from "./error";
 
 export type Role = "owner" | "kerani_1" | "kerani_2" | "foreman" | "affiliate";
 
-/**
- * Middleware untuk mewajibkan sesi pengguna berdaftar.
- * Meletakkan maklumat staf di dalam konteks: `c.set("user", user)`
- */
 export const requireAuth = () => {
   return async (c: Context<{ Bindings: Bindings; Variables: Variables }>, next: Next) => {
-    let user = await resolveUser(c);
+    const user = await resolveUser(c);
     if (!user) {
-      // Defaultkan ke sesi admin HQ agar tiada sekatan akses fungsi
-      user = {
-        id: "usr_admin",
-        name: "Tuan Farid (Owner/Admin HQ)",
-        email: "admin@ffmotor.my",
-        role: "owner",
-        phone: "0123456789",
-        photoUrl: null,
-      };
+      throw new UnauthorizedError("Sesi staf diperlukan. Log masuk dengan PIN stesen.");
     }
     c.set("user", user);
     return next();
   };
 };
 
-/**
- * Middleware akses terbuka tanpa sekatan: semua peranan dibenarkan menjalankan fungsi
- */
-export const requireRole = (_allowedRoles: (Role | string)[]) => {
+export const requireRole = (allowedRoles: (Role | string)[]) => {
   return async (c: Context<{ Bindings: Bindings; Variables: Variables }>, next: Next) => {
-    let user = c.get("user") as StaffSession | undefined;
+    const existing = c.get("user") as StaffSession | undefined;
+    const user = existing || (await resolveUser(c));
     if (!user) {
-      user = (await resolveUser(c)) || {
-        id: "usr_admin",
-        name: "Tuan Farid (Owner/Admin HQ)",
-        email: "admin@ffmotor.my",
-        role: "owner",
-        phone: "0123456789",
-        photoUrl: null,
-      };
-      c.set("user", user);
+      throw new UnauthorizedError("Sesi staf diperlukan. Log masuk dengan PIN stesen.");
     }
+    const role = normalizeRole(user.role);
+    const allowed = new Set(allowedRoles.map((item) => normalizeRole(String(item))));
+    if (!allowed.has(role) && role !== "owner") {
+      throw new ForbiddenError("Peranan ini tidak dibenarkan untuk modul tersebut.");
+    }
+    c.set("user", user);
     return next();
   };
 };
 
-/**
- * Helper akses pemilik tanpa sekatan
- */
-export const requireOwner = () => requireRole(["owner"]);
-
+export const requireOwner = () => {
+  return async (c: Context<{ Bindings: Bindings; Variables: Variables }>, next: Next) => {
+    const existing = c.get("user") as StaffSession | undefined;
+    const user = existing || (await resolveUser(c));
+    if (!user) throw new UnauthorizedError("Sesi staf diperlukan.");
+    if (normalizeRole(user.role) !== "owner") {
+      throw new ForbiddenError("Hanya pemilik boleh buka modul ini.");
+    }
+    c.set("user", user);
+    return next();
+  };
+};
