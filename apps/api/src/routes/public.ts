@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { and, desc, eq, or, sql } from "drizzle-orm";
 import { nanoid } from "nanoid";
-import { createDb, itemShots, motorcycles, partOrders, products, serviceSlots, unitHolds, users, vehicles, workOrders, workOrderItems } from "@ffmotor/db";
+import { createDb, customerAccess, itemShots, motorcycles, partOrders, products, serviceSlots, unitHolds, users, vehicles, workOrders, workOrderItems } from "@ffmotor/db";
 import { requiredSlots } from "./shots";
 import { normalizeRole } from "../authz";
 import { Bindings, Variables } from "../types";
@@ -343,29 +343,58 @@ publicRouter.get("/slots", async (c) => {
 
 publicRouter.get("/track", async (c) => {
   const plate = String(c.req.query("plate") || "").toUpperCase().replace(/\s+/g, "");
-  if (plate.length < 2) return c.json({ success: false, message: "Plat wajib" }, 400);
+  if (plate.length < 2) return c.json({ success: false, found: false, message: "Plat wajib" }, 400);
   const db = createDb(c.env.DB);
   const vehicle = (await db.select().from(vehicles).where(eq(vehicles.plateNormalized, plate)).all())[0];
-  if (!vehicle) return c.json({ success: true, found: false });
-  const jobs = await db.select().from(workOrders).where(eq(workOrders.vehicleId, vehicle.id)).all();
-  const latest = jobs.sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
-  if (!latest) return c.json({ success: true, found: false });
-  const normalized = latest.status === "waiting_approval" ? "inspecting" : latest.status === "cancelled" ? "pending" : latest.status;
-  const order = ["pending", "inspecting", "in_progress", "waiting_parts", "ready", "completed"];
-  const at = order.indexOf(normalized);
-  return c.json({
-    success: true,
-    found: true,
-    woNumber: latest.woNumber,
-    status: latest.status,
-    steps: [
-      { id: "pending", label: "Daftar masuk", done: at >= 0 },
-      { id: "inspecting", label: "Pemeriksaan", done: at >= 1 },
-      { id: "in_progress", label: "Di pit", done: at >= 2 },
-      { id: "waiting_parts", label: "Menunggu alat", done: at >= 3 },
-      { id: "ready", label: "Siap", done: at >= 4 },
-    ],
-  });
+  if (vehicle) {
+    const jobs = await db.select().from(workOrders).where(eq(workOrders.vehicleId, vehicle.id)).all();
+    const latest = jobs.sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+    if (!latest) {
+      return c.json({
+        success: true,
+        found: true,
+        plateNumber: vehicle.plateNumber,
+        vehicle: { model: vehicle.model, brand: vehicle.brand },
+        activeWorkOrder: null,
+        passportUrl: `/#passport-${encodeURIComponent(vehicle.plateNumber || plate)}`,
+        message: "Rekod motosikal dijumpai. Tiada kerja pembaikan aktif.",
+      });
+    }
+    const normalized = latest.status === "waiting_approval" ? "inspecting" : latest.status === "cancelled" ? "pending" : latest.status;
+    const order = ["pending", "inspecting", "in_progress", "waiting_parts", "ready", "completed"];
+    const at = order.indexOf(normalized);
+    return c.json({
+      success: true,
+      found: true,
+      plateNumber: vehicle.plateNumber,
+      vehicle: { model: vehicle.model, brand: vehicle.brand },
+      woNumber: latest.woNumber,
+      status: latest.status,
+      activeWorkOrder: latest,
+      passportUrl: `/#passport-${encodeURIComponent(vehicle.plateNumber || plate)}`,
+      steps: [
+        { id: "pending", label: "Daftar masuk", done: at >= 0 },
+        { id: "inspecting", label: "Pemeriksaan", done: at >= 1 },
+        { id: "in_progress", label: "Di pit", done: at >= 2 },
+        { id: "waiting_parts", label: "Menunggu alat", done: at >= 3 },
+        { id: "ready", label: "Siap", done: at >= 4 },
+      ],
+    });
+  }
+  const bikes = await db.select().from(motorcycles).all();
+  const bike = bikes.find((row) => String(row.plateNumber || "").toUpperCase().replace(/\s+/g, "") === plate);
+  if (bike) {
+    return c.json({
+      success: true,
+      found: true,
+      source: "showroom",
+      plateNumber: bike.plateNumber,
+      vehicle: { model: bike.model, brand: bike.brand },
+      activeWorkOrder: null,
+      message: "Unit showroom dijumpai. Belum ada rekod servis bengkel.",
+    });
+  }
+  return c.json({ success: true, found: false, message: "Rekod nombor plat tidak dijumpai." });
 });
 
 publicRouter.post("/slots", async (c) => {
@@ -393,3 +422,110 @@ publicRouter.post("/slots", async (c) => {
   return c.json({ success: true, bay, id, message: `Slot direkod di bay ${bay}. Ini draf, bukan hanya mesej WhatsApp.` });
 });
 
+
+publicRouter.get("/bays", async (c) => {
+  const db = createDb(c.env.DB);
+  const today = new Date().toISOString().slice(0, 10);
+  const rows = await db.select().from(serviceSlots).where(and(eq(serviceSlots.slotDate, today), eq(serviceSlots.status, "booked"))).all();
+  const bays = [1, 2, 3, 4].map((bay) => {
+    const slot = rows.find((row) => row.bay === bay);
+    if (!slot) {
+      return {
+        id: `BAY-0${bay}`,
+        status: "ready",
+        statusLabel: "KOSONG",
+        bike: "Tiada unit direkod",
+        job: "Tiada slot hari ini",
+        technician: "Belum ditugaskan",
+        progress: 0,
+      };
+    }
+    return {
+      id: `BAY-0${bay}`,
+      status: "occupied",
+      statusLabel: "BERJADUAL",
+      bike: slot.plate,
+      job: `${slot.slotTime} · ${slot.serviceType}`,
+      technician: slot.customerName,
+      progress: 0,
+    };
+  });
+  return c.json({
+    ok: true,
+    success: true,
+    found: rows.length > 0,
+    message: rows.length ? `${rows.length} slot hari ini.` : "Tiada slot direkod hari ini.",
+    bays,
+  });
+});
+
+publicRouter.post("/bays", async (c) => {
+  const { resolveUser } = await import("../authz");
+  const user = await resolveUser(c);
+  if (!user) return c.json({ ok: false, success: false, message: "Sesi staf diperlukan untuk kemas kini bay." }, 401);
+  const body = await c.req.json();
+  const bay = Number(body.bay);
+  if (![1, 2, 3, 4].includes(bay)) return c.json({ ok: false, success: false, message: "Bay mesti 1 hingga 4." }, 400);
+  const db = createDb(c.env.DB);
+  const today = new Date().toISOString().slice(0, 10);
+  if (body.clear) {
+    await db.delete(serviceSlots).where(and(eq(serviceSlots.slotDate, today), eq(serviceSlots.bay, bay)));
+    return c.json({ ok: true, success: true, message: `Bay ${bay} dikosongkan.` });
+  }
+  if (!body.plate || !body.serviceType) return c.json({ ok: false, success: false, message: "Plat dan jenis kerja wajib." }, 400);
+  await db.delete(serviceSlots).where(and(eq(serviceSlots.slotDate, today), eq(serviceSlots.bay, bay)));
+  await db.insert(serviceSlots).values({
+    id: `bay_${nanoid(8)}`,
+    bay,
+    slotDate: today,
+    slotTime: String(body.time || "09:00"),
+    plate: String(body.plate).toUpperCase(),
+    customerName: user.name,
+    customerPhone: user.phone || "-",
+    serviceType: String(body.serviceType),
+    status: "booked",
+    createdAt: new Date().toISOString(),
+  });
+  return c.json({ ok: true, success: true, message: `Bay ${bay} dikemas kini oleh ${user.name}.` });
+});
+
+publicRouter.post("/customer/login", async (c) => {
+  const body = await c.req.json();
+  const phone = String(body.phone || "").replace(/\D/g, "");
+  const pin = String(body.pin || "").trim();
+  if (phone.length < 9 || pin.length < 4) {
+    return c.json({ ok: false, success: false, message: "Telefon dan PIN pelanggan wajib." }, 400);
+  }
+  const db = createDb(c.env.DB);
+  await db.$client.prepare(`CREATE TABLE IF NOT EXISTS customer_access (
+    id text PRIMARY KEY NOT NULL,
+    phone text NOT NULL,
+    pin_code text NOT NULL,
+    name text NOT NULL,
+    is_active integer NOT NULL DEFAULT 1,
+    created_at text NOT NULL
+  )`).run();
+  await db.$client.prepare(`CREATE TABLE IF NOT EXISTS customer_sessions (
+    token text PRIMARY KEY NOT NULL,
+    customer_id text NOT NULL,
+    expires_at text NOT NULL,
+    created_at text NOT NULL
+  )`).run();
+  const rows = await db.select().from(customerAccess).all();
+  const match = rows.find((row) => row.isActive && String(row.phone).replace(/\D/g, "") === phone && row.pinCode === pin);
+  if (!match) return c.json({ ok: false, success: false, message: "Telefon atau PIN pelanggan tidak sah." }, 401);
+  const token = `cus_${nanoid(24)}`;
+  const now = new Date();
+  const expires = new Date(now.getTime() + 12 * 3600 * 1000).toISOString();
+  await db.$client.prepare("INSERT INTO customer_sessions (token, customer_id, expires_at, created_at) VALUES (?1, ?2, ?3, ?4)")
+    .bind(token, match.id, expires, now.toISOString()).run();
+  const owned = await db.select().from(vehicles).all();
+  const mine = owned.filter((row) => String(row.ownerPhone || "").replace(/\D/g, "") === phone);
+  return c.json({
+    ok: true,
+    success: true,
+    token,
+    customer: { id: match.id, name: match.name, phone: match.phone },
+    vehicles: mine,
+  });
+});

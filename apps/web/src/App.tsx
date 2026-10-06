@@ -3,7 +3,6 @@ import { Sidebar } from "./components/layout/Sidebar";
 import { HeaderBar } from "./components/layout/HeaderBar";
 import { CanvasBackdrop } from "./components/canvas/CanvasBackdrop";
 import { useCanvasParallax } from "./lib/useCanvasParallax";
-import { sessionHeader } from "./lib/api";
 
 import { Dashboard } from "./pages/Dashboard";
 import { OwnerDashboard } from "./pages/dashboards/OwnerDashboard";
@@ -48,6 +47,9 @@ import { CommandPalette } from "./components/ui/CommandPalette";
 import { tacticalAudio, tactileAudio } from "./lib/audio";
 
 import { WorkOrder, Product, Vehicle, Motorcycle, Lead } from "./types";
+import { MenuStation } from "./pages/MenuStation";
+import { FormModules } from "./pages/FormModules";
+import { ForemanJob } from "./pages/ForemanJob";
 
 const DEFAULT_USER: AuthenticatedUser = {
   id: "usr_admin",
@@ -68,6 +70,7 @@ const normalizeTab = (rawTab: string): string => {
   if (clean === "wo") return "work-orders";
   if (clean === "vo" || clean.startsWith("vo-")) return "vo-view";
   if (clean === "quote" || clean.startsWith("quote-")) return "quote-view";
+  if (clean === "foreman-job" || clean === "foremanjob" || clean === "job") return "foreman-job";
   return clean || "dashboard";
 };
 
@@ -82,6 +85,7 @@ const getInitialTab = (): string => {
     if (path.startsWith("/quote/")) return "quote-view";
     if (path.startsWith("/sa") || path.startsWith("/kaunter")) return "express-intake";
     if (path.startsWith("/m") || path.startsWith("/pit")) return "pit-live";
+    if (path.startsWith("/foreman-job") || path.startsWith("/job")) return "foreman-job";
     if (path.startsWith("/saya")) return "customer-portal";
     if (path.startsWith("/katalog")) return "katalog";
   }
@@ -90,18 +94,72 @@ const getInitialTab = (): string => {
 
 
 export const normalizeRole = (role?: string): string => {
-  if (!role) return "owner";
+  if (!role) return "";
   const r = role.toLowerCase().trim();
-  if (r === "admin" || r === "hq" || r === "tauke" || r === "bos") return "owner";
-  if (r === "cashier" || r === "sa" || r === "kerani" || r === "kerani1") return "kerani_1";
-  if (r === "stor" || r === "store" || r === "kerani2") return "kerani_2";
-  if (r === "mechanic" || r === "mekanik" || r === "chief") return "foreman";
-  if (r === "sales" || r === "ejen") return "affiliate";
+  if (r === "owner" || r === "admin" || r === "hq" || r === "tauke" || r === "bos") return "owner";
+  if (r === "kerani_1" || r === "cashier" || r === "sa" || r === "kerani" || r === "kerani1") return "kerani_1";
+  if (r === "kerani_2" || r === "stor" || r === "store" || r === "kerani2") return "kerani_2";
+  if (r === "foreman" || r === "mechanic" || r === "mekanik" || r === "chief") return "foreman";
+  if (r === "affiliate" || r === "sales" || r === "ejen") return "affiliate";
   return r;
 };
 
-// Semua menu dan stesen dibenarkan berjalan tanpa sebarang sekatan
-const isTabAllowed = (_rawRole: string, _tab: string) => true;
+export const ROLE_TABS: Record<string, string[]> = {
+  owner: [
+    "finance",
+    "settings",
+    "owner-accounts",
+    "owner-price",
+    "owner-arahan",
+    "staff",
+    "staff-performance",
+    "work-orders",
+    "dashboard",
+    "owner-desk",
+  ],
+  kerani_1: [
+    "express-intake",
+    "work-orders",
+    "pos-checkout",
+    "quotations",
+    "customers",
+    "crm",
+    "inbox",
+    "leads",
+    "dashboard",
+  ],
+  kerani_2: [
+    "inventory",
+    "suppliers",
+    "authenticity",
+    "work-orders",
+    "ecommerce-orders",
+    "dashboard",
+  ],
+  foreman: [
+    "pit-live",
+    "work-orders",
+    "photo-servis",
+    "foreman-job",
+    "dashboard",
+  ],
+  affiliate: [
+    "affiliate",
+    "dashboard",
+  ],
+};
+
+export const isTabAllowed = (rawRole: string, tab: string): boolean => {
+  const role = normalizeRole(rawRole);
+  if (role === "owner" || role === "admin" || rawRole === "owner" || rawRole === "admin") {
+    return true;
+  }
+  const allowed = ROLE_TABS[role];
+  if (!allowed) {
+    return false;
+  }
+  return allowed.includes(tab);
+};
 
 const Unauthorized = () => (
   <div className="flex items-center justify-center min-h-[400px]">
@@ -178,7 +236,7 @@ export const App: React.FC = () => {
       const saved = localStorage.getItem("ffmotor_current_user");
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (parsed && typeof parsed.name === "string" && typeof parsed.role === "string") {
+        if (parsed && typeof parsed.id === "string" && typeof parsed.role === "string") {
           return parsed;
         }
       }
@@ -200,11 +258,12 @@ export const App: React.FC = () => {
 
   useEffect(() => {
     try {
-      if (!localStorage.getItem("ffmotor_current_user")) {
+      const saved = localStorage.getItem("ffmotor_current_user");
+      if (!saved && currentUser?.id && currentUser.id !== DEFAULT_USER.id) {
         localStorage.setItem("ffmotor_current_user", JSON.stringify(currentUser));
       }
     } catch {
-      /* simpan sesi gagal, panggilan API akan minta tukar akaun */
+      /* simpan sesi gagal */
     }
   }, [currentUser]);
 
@@ -216,18 +275,16 @@ export const App: React.FC = () => {
   const [, setLoading] = useState(false);
 
   // Parameter untuk pautan pantas
-  const [trackToken, setTrackToken] = useState("tok_vdf8899");
-  const [passportPlate, setPassportPlate] = useState("VDF 8899");
-  const [voToken, setVoToken] = useState("vo_tok_sample");
+  const [trackToken, setTrackToken] = useState("");
+  const [passportPlate, setPassportPlate] = useState("");
+  const [voToken, setVoToken] = useState("");
   const [quoteId, setQuoteId] = useState("q-1");
 
   const fetchWithTimeout = async (url: string, timeoutMs = 8000) => {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
     try {
-      const headers: Record<string, string> = {
-        ...sessionHeader(),
-      };
+      const headers: Record<string, string> = {};
       if (currentUser?.id) {
         headers["x-ff-user-id"] = currentUser.id;
       }
@@ -422,6 +479,8 @@ export const App: React.FC = () => {
 
         {/* Bekas Halaman Dinamik */}
         <main className="flex-1 w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <MenuStation tab={activeTab} />
+          <FormModules tab={activeTab} />
           {!isTabAllowed(currentUser.role, activeTab) ? (
             <Unauthorized />
           ) : (
@@ -461,7 +520,10 @@ export const App: React.FC = () => {
             />
           )}
 
-          {activeTab === "pos-checkout" && (
+          {activeTab === "pos-checkout" && !localStorage.getItem("ffmotor_staff_token") && (
+            <div className="p-8 text-sm font-bold text-red-700">POS dikunci. Log masuk staf diperlukan. Tiada sesi pelayan, tiada jualan.</div>
+          )}
+          {activeTab === "pos-checkout" && localStorage.getItem("ffmotor_staff_token") && (
             <PosCheckout
               products={products}
               workOrders={workOrders}
@@ -484,7 +546,11 @@ export const App: React.FC = () => {
           )}
 
           {/* SEKSYEN B: LANTAI BENGKEL & PIT LIF */}
-          {activeTab === "pit-live" && (
+          {activeTab === "pit-live" && !localStorage.getItem("ffmotor_staff_token") && (
+            <div className="p-8 text-sm font-bold text-red-700">Pit dikunci. Log masuk staf diperlukan.</div>
+          )}
+          {activeTab === "foreman-job" && <ForemanJob />}
+          {activeTab === "pit-live" && localStorage.getItem("ffmotor_staff_token") && (
             <PitTerminal
               workOrders={workOrders}
               products={products}
@@ -504,7 +570,10 @@ export const App: React.FC = () => {
           )}
 
           {/* SEKSYEN C: STOR ALAT GANTI & LOGISTIK */}
-          {activeTab === "inventory" && (
+          {activeTab === "inventory" && !localStorage.getItem("ffmotor_staff_token") && (
+            <div className="p-8 text-sm font-bold text-red-700">Stor dikunci. Log masuk staf diperlukan.</div>
+          )}
+          {activeTab === "inventory" && localStorage.getItem("ffmotor_staff_token") && (
             <Inventory
               products={products}
               onRefresh={loadData}

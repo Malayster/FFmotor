@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Megaphone,
   Plus,
@@ -24,36 +24,25 @@ interface CampaignItem {
 }
 
 export const Campaigns: React.FC = () => {
-  const [campaigns, setCampaigns] = useState<CampaignItem[]>([
-    {
-      id: "KMP-01",
-      title: "Pakej Servis Balik Kampung Raya",
-      tagline: "Minyak Enjin Fully Synthetic + Plug NGK + Percuma Cuci Rantai",
-      targetAudience: "Semua pelanggan servis (300+ Pemilik)",
-      estimatedReach: 320,
-      promoPrice: 55,
-      messageContent:
-        "Salam Bro! Jom servis motor sebelum balik kampung sempena cuti perayaan ini di *FFmotor*.\n\n" +
-        "Pakej Istimewa Raya hanya *RM 55.00* termasuk:\n" +
-        "• Minyak Enjin Fully Synthetic 1L\n• Spark Plug Baru Original\n• Pemeriksaan 15 Titik Brek & Tayar Percuma!\n\n" +
-        "Balas *SERVIS* untuk tempah slot anda hari ini. Selamat Hari Raya dari FFmotor!",
-      status: "active",
-    },
-    {
-      id: "KMP-02",
-      title: "Pemeriksaan Percuma Belting CVT Skuter",
-      tagline: "Elak belting putus tengah jalan - Pemeriksaan & cuci habuk percuma",
-      targetAudience: "Pemilik Skuter (NVX, Vario, NMAX, Avantiz)",
-      estimatedReach: 140,
-      promoPrice: 0,
-      messageContent:
-        "Salam Bro! Skuter anda dah lama tak servis bahagian CVT? Di *FFmotor*, kami tawarkan *Pemeriksaan Kehausan Belting & Roller Percuma* minggu ini.\n\n" +
-        "Elak belting putus di lebuh raya. Singgah ke FFmotor hari ini!",
-      status: "active",
-    },
-  ]);
-
-  const [selectedCampaign, setSelectedCampaign] = useState<CampaignItem>(campaigns[0]);
+  const [campaigns, setCampaigns] = useState<CampaignItem[]>(() => [] as CampaignItem[]);
+  useEffect(() => {
+    fetch("/api/vehicles").then((r) => r.json()).then((d) => {
+      const rows = Array.isArray(d.vehicles) ? d.vehicles : [];
+      const due = rows.filter((v: { lastServiceDate?: string }) => Boolean(v.lastServiceDate));
+      if (due.length === 0) return;
+      setCampaigns([{
+        id: "KMP-SERVIS",
+        title: "Peringatan servis dari rekod",
+        tagline: "Hanya pelanggan yang ada tarikh servis",
+        targetAudience: `${due.length} rekod servis`,
+        estimatedReach: due.length,
+        promoPrice: 0,
+        messageContent: "Servis susulan berdasarkan tarikh terakhir dalam rekod kedai.",
+        status: "active",
+      }]);
+    }).catch(() => null);
+  }, []);
+  const [selectedCampaign, setSelectedCampaign] = useState<CampaignItem | null>(campaigns[0] || null);
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const [newTagline, setNewTagline] = useState("");
@@ -83,6 +72,7 @@ export const Campaigns: React.FC = () => {
   };
 
   const handleTestBroadcast = () => {
+    if (!selectedCampaign) return;
     // Simulasi hantar WhatsApp ke nombor sendiri
     const link = createWhatsAppLink("0123456789", selectedCampaign.messageContent);
     window.open(link, "_blank");

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Users,
   Share2,
@@ -29,6 +29,15 @@ interface AffiliatePortalProps {
 }
 
 export const AffiliatePortal: React.FC<AffiliatePortalProps> = ({ onBackToApp }) => {
+  const [note, setNote] = useState("Memuat ejen dari rekod staf...");
+  useEffect(() => {
+    fetch("/api/staff").then((r) => r.json()).then((d) => {
+      const rows = d.staff || d.users || [];
+      const agents = Array.isArray(rows) ? rows.filter((u: { role?: string }) => String(u.role).includes("affiliate")) : [];
+      setNote(agents.length ? `${agents.length} ejen dalam rekod staf.` : "Tiada ejen berdaftar. Tambah di Akaun Staf.");
+    }).catch(() => setNote("Rekod ejen tidak dapat dibaca."));
+  }, []);
+
   const [ejenCode, setEjenCode] = useState("EJEN-DANIAL");
   const [copiedLink, setCopiedLink] = useState(false);
 
@@ -154,6 +163,7 @@ export const AffiliatePortal: React.FC<AffiliatePortalProps> = ({ onBackToApp })
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-8">
+        <p className="text-xs font-bold text-zinc-700 bg-white border border-zinc-200 rounded-xl px-3 py-2">{note}</p>
         {/* Banner Profil & Kotak Salin Link Peribadi */}
         <div className="bg-white border-2 border-zinc-300 rounded-3xl p-6 sm:p-8 shadow-sm flex flex-col md:flex-row items-center justify-between gap-6 text-black">
           <div className="space-y-2">

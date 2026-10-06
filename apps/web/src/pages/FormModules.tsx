@@ -17,9 +17,9 @@ async function send(endpoint: string, body: Record<string, unknown>): Promise<Re
 }
 
 const Field = ({ label, value, set, type = "text" }: { label: string; value: string; set: (v: string) => void; type?: string }) => (
-  <label className="block text-xs font-bold text-zinc-950">
+  <label className="block text-xs font-bold text-zinc-800">
     {label}
-    <input className="mt-1 w-full rounded-xl border-2 border-zinc-300 bg-white px-3 py-2 text-sm font-bold text-zinc-950 outline-none focus:border-zinc-950" type={type} value={value} onChange={(e) => set(e.target.value)} required />
+    <input className="mt-1 w-full rounded-xl border-2 border-zinc-300 px-3 py-2 text-sm" type={type} value={value} onChange={(e) => set(e.target.value)} required />
   </label>
 );
 
@@ -68,6 +68,10 @@ export const FormModules: React.FC<{ tab: string }> = ({ tab }) => {
       title: "Kunci unit",
       onSubmit: () => send("/api/locks", { plate, customerName: name, customerPhone: phone, note }),
     },
+    inventory: {
+      title: "Pergerakan stok",
+      onSubmit: () => send("/api/products/movements", { sku: plate, movement: name, qty: Number(amount || 0), documentRef: phone, note }),
+    },
   };
 
   const form = forms[tab];
@@ -82,6 +86,13 @@ export const FormModules: React.FC<{ tab: string }> = ({ tab }) => {
       }}
     >
       <h2 className="text-lg font-black text-zinc-950">{form.title}</h2>
+      {tab === "inventory" && (
+        <div className="flex flex-wrap gap-2">
+          {["Terima stok", "Pindah stok", "Guna stok", "Stok rosak", "Stok bermasalah", "Return"].map((label) => (
+            <button key={label} type="button" className="rounded-xl border-2 border-zinc-950 px-3 py-1.5 text-xs font-black" onClick={() => setName(label)}>{label}</button>
+          ))}
+        </div>
+      )}
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label="Nama" value={name} set={setName} />
         <Field label="Telefon" value={phone} set={setPhone} />

@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { DbClient } from "@ffmotor/db";
 import {
+  customerAccess,
   users,
   vehicles,
   products,
@@ -24,7 +25,6 @@ import {
   loanApplications,
   variationOrders,
   itemShots,
-  customerAccess,
 } from "@ffmotor/db";
 
 async function safeInsertRows(db: DbClient, table: any, rows: any[]) {
@@ -42,6 +42,21 @@ export async function seedInitialData(db: DbClient) {
 
   // 1. Staf Stesen Rasmi & Zero-Trust PIN
   const existingUsers = await db.select().from(users).all();
+  const stationPins = [
+    { email: "admin@ffmotor.my", pinCode: "8899", role: "owner" },
+    { email: "aiman@ffmotor.my", pinCode: "3344", role: "kerani_1" },
+    { email: "fauzi@ffmotor.my", pinCode: "2233", role: "kerani_2" },
+    { email: "din@ffmotor.my", pinCode: "1122", role: "foreman" },
+    { email: "zack@ffmotor.my", pinCode: "5566", role: "affiliate" },
+    { email: "siti@ffmotor.my", pinCode: "3344", role: "kerani_1" },
+  ] as const;
+  for (const station of stationPins) {
+    const row = existingUsers.find((user) => user.email === station.email);
+    if (row && !row.pinCode) {
+      await db.update(users).set({ pinCode: station.pinCode, role: station.role, isActive: true }).where(eq(users.id, row.id));
+    }
+  }
+
   if (existingUsers.length === 0) {
     try {
       await safeInsertRows(db, users, [
@@ -922,44 +937,25 @@ export async function seedInitialData(db: DbClient) {
   ]);
 }
 
+
 export async function seedCustomerPins(db: DbClient) {
   const now = new Date().toISOString();
-  try {
-    await (db as any).$client?.prepare?.(`CREATE TABLE IF NOT EXISTS customer_access (
-      id text PRIMARY KEY NOT NULL,
-      phone text NOT NULL,
-      pin_code text NOT NULL,
-      name text NOT NULL,
-      is_active integer NOT NULL DEFAULT 1,
-      created_at text NOT NULL
-    )`).run?.();
-    await (db as any).$client?.prepare?.(`CREATE TABLE IF NOT EXISTS customer_sessions (
-      token text PRIMARY KEY NOT NULL,
-      customer_id text NOT NULL,
-      expires_at text NOT NULL,
-      created_at text NOT NULL
-    )`).run?.();
-  } catch {
-    // Tables may already exist
+  await db.$client.prepare(`CREATE TABLE IF NOT EXISTS customer_access (
+    id text PRIMARY KEY NOT NULL,
+    phone text NOT NULL,
+    pin_code text NOT NULL,
+    name text NOT NULL,
+    is_active integer NOT NULL DEFAULT 1,
+    created_at text NOT NULL
+  )`).run();
+  const existing = await db.select().from(customerAccess).all();
+  const pins = [
+    { id: "cus_akmal", phone: "0192233445", pinCode: "2468", name: "Akmal Hakim" },
+    { id: "cus_bra", phone: "0178899001", pinCode: "1357", name: "Pelanggan BRA 4321" },
+  ];
+  for (const pin of pins) {
+    if (!existing.some((row) => row.phone === pin.phone)) {
+      await db.insert(customerAccess).values({ ...pin, isActive: true, createdAt: now });
+    }
   }
-
-  await safeInsertRows(db, customerAccess, [
-    {
-      id: "cust_acc_1",
-      phone: "0192233445",
-      pinCode: "1234",
-      name: "Akmal Hakim",
-      isActive: true,
-      createdAt: now,
-    },
-    {
-      id: "cust_acc_2",
-      phone: "0178899001",
-      pinCode: "4321",
-      name: "Faizal Roslan",
-      isActive: true,
-      createdAt: now,
-    },
-  ]);
 }
-

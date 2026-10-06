@@ -54,9 +54,9 @@ export const WorkshopSettings: React.FC<WorkshopSettingsProps> = ({ onSaved }) =
       state: "Selangor Darul Ehsan",
       operatingHours: "Isnin – Sabtu: 8:30 AM – 6:30 PM (Ahad: Tutup)",
       sstNumber: "W10-2401-32000451",
-      bankName: "Malayan Banking Berhad (Maybank)",
-      bankAccountNo: "5128 4492 1092",
-      bankAccountName: "FFMOTOR SDN BHD",
+      bankName: "",
+      bankAccountNo: "",
+      bankAccountName: "",
       duitnowMerchantId: "MERCHANT-FFMTR-RAWANG",
       hourlyLaborRate: "45.00",
       maxSaDiscountPercent: "5",
@@ -79,10 +79,17 @@ export const WorkshopSettings: React.FC<WorkshopSettingsProps> = ({ onSaved }) =
   };
 
   const handleConfirmSaveWithPin = () => {
-    // Sahkan PIN Pemilik HQ (8899)
-    if (ownerPin !== "8899") {
+    let role = "";
+    try {
+      role = JSON.parse(localStorage.getItem("ffmotor_current_user") || "{}").role || "";
+    } catch { role = ""; }
+    if (role !== "owner") {
       tactileAudio.warningAlert();
-      setPinError("PIN Pemilik tidak sah. Sila masukkan PIN HQ yang betul.");
+      setPinError("Hanya sesi pemilik boleh simpan akaun bank.");
+      return;
+    }
+    if (!formData.bankAccountNo || String(formData.bankAccountNo).trim().length < 6) {
+      setPinError("Nombor akaun wajib diisi oleh pemilik. Jangan simpan nombor contoh.");
       return;
     }
 
@@ -346,7 +353,7 @@ export const WorkshopSettings: React.FC<WorkshopSettingsProps> = ({ onSaved }) =
                 autoFocus
                 value={ownerPin}
                 onChange={(e) => setOwnerPin(e.target.value)}
-                placeholder="Masukkan PIN (cth: 8899)"
+                placeholder="•••• (Masukkan PIN HQ)"
                 className="w-full border-2 border-zinc-300 rounded-xl px-4 py-2.5 text-center font-mono font-black text-xl tracking-widest text-zinc-950 focus:outline-none focus:border-zinc-950"
               />
               {pinError && <p className="text-xs text-red-700 font-bold">{pinError}</p>}

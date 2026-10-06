@@ -35,15 +35,15 @@ if (typeof window !== "undefined") {
     if (url.includes("/api/")) {
       try {
         const rawUser = localStorage.getItem("ffmotor_current_user");
-        if (rawUser) {
-          const user = JSON.parse(rawUser);
-          if (user?.id) {
-            const headers = new Headers(init?.headers);
-            if (!headers.has("x-ff-user-id") && !headers.has("X-FF-User-Id")) {
-              headers.set("x-ff-user-id", user.id);
-            }
-            init = { ...init, headers };
+        const token = localStorage.getItem("ffmotor_staff_token");
+        if (rawUser || token) {
+          const user = rawUser ? JSON.parse(rawUser) : {};
+          const headers = new Headers(init?.headers);
+          const bearer = token || user?.token;
+          if (bearer && !headers.has("authorization") && !headers.has("Authorization")) {
+            headers.set("authorization", `Bearer ${bearer}`);
           }
+          init = { ...init, headers };
         }
       } catch {
         /* teruskan permintaan */
@@ -199,22 +199,23 @@ function getRouteInfo(): RouteResult {
 
 function Root() {
   const [route, setRoute] = useState<RouteResult>(getRouteInfo);
-  const [staff, setStaff] = useState(() => {
+  const readStaff = () => {
     try {
-      return localStorage.getItem("ffmotor_staff_session") === "1";
+      if (localStorage.getItem("ffmotor_staff_session") !== "1") return false;
+      const raw = localStorage.getItem("ffmotor_current_user");
+      if (!raw) return false;
+      const user = JSON.parse(raw) as { id?: string; role?: string };
+      return Boolean(user?.id && user?.role);
     } catch {
       return false;
     }
-  });
+  };
+  const [staff, setStaff] = useState(readStaff);
 
   useEffect(() => {
     const handleLocationChange = () => {
       setRoute(getRouteInfo());
-      try {
-        setStaff(localStorage.getItem("ffmotor_staff_session") === "1");
-      } catch {
-        setStaff(false);
-      }
+      setStaff(readStaff());
     };
 
     window.addEventListener("hashchange", handleLocationChange);

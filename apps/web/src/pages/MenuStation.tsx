@@ -89,8 +89,8 @@ export const MenuStation: React.FC<{ tab: string }> = ({ tab }) => {
       <p className="text-[11px] font-black uppercase tracking-wider text-red-600">Menu {spec.id}</p>
       <h1 className="text-xl font-black text-zinc-950">{spec.title}</h1>
       <p className="mt-1 text-sm font-bold text-zinc-800">{state.status}. Rekod dibaca: {state.count}.</p>
-      <p className="text-xs font-mono font-bold text-zinc-800">{state.detail}</p>
-      {state.count === 0 && <p className="mt-2 text-xs font-bold text-zinc-800">Tiada rekod. Menu ini tidak diisi dengan data contoh.</p>}
+      <p className="text-xs font-mono text-zinc-500">{state.detail}</p>
+      {state.count === 0 && <p className="mt-2 text-xs font-bold text-zinc-600">Tiada rekod. Menu ini tidak diisi dengan data contoh.</p>}
     </section>
   );
 };

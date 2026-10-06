@@ -285,8 +285,10 @@ export const StaffStationModal: React.FC<StaffStationModalProps> = ({
                       </p>
                     </div>
                   </div>
-                  <span className="text-xs font-mono font-black px-2 py-1 rounded bg-zinc-100 border border-zinc-300 text-zinc-950 shrink-0">
-                    PIN: {acc.pin}
+                  <span className={`text-[11px] font-black px-2 py-1 rounded border shrink-0 ${
+                    isCurrent ? "bg-red-50 text-red-700 border-red-300" : "bg-zinc-100 text-zinc-800 border-zinc-300"
+                  }`}>
+                    {isCurrent ? "Aktif" : "Pilih Stesen"}
                   </span>
                 </button>
               );
@@ -305,7 +307,7 @@ export const StaffStationModal: React.FC<StaffStationModalProps> = ({
               maxLength={4}
               value={pinInput}
               onChange={(e) => setPinInput(e.target.value)}
-              placeholder="PIN (cth: 8899, 3344)"
+              placeholder="•••• (Masukkan PIN)"
               className="flex-1 bg-white border-2 border-zinc-300 focus:border-red-600 text-center text-zinc-950 text-lg tracking-widest font-mono rounded-xl p-2 outline-none font-black"
             />
             <button

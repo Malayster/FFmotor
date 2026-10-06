@@ -73,7 +73,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const handleOpenStation = onOpenStationModal || onOpenZeroTrustModal;
 
-  // Stesen 1: Pemilik Bengkel (Owner HQ - PIN 8899)
+  // Stesen 1: Pemilik Bengkel (Owner HQ)
   const ownerSections: NavSection[] = [
     {
       title: "Kawalan HQ & Prestasi",
@@ -108,9 +108,25 @@ export const Sidebar: React.FC<SidebarProps> = ({
         { id: "ecommerce-orders", label: "Pesanan Web & Kurier", icon: Truck, badge: "Web" },
       ],
     },
+    {
+      title: "Pintu 30-40, laman yang sama",
+      items: [
+        { id: "katalog", label: "30 Katalog awam", icon: Bike, badge: "Awam" },
+        { id: "customer-portal", label: "31 Portal pelanggan", icon: UserCheck, badge: "Awam" },
+        { id: "quote-view", label: "32 Sebut harga awam", icon: FileText, badge: "Awam" },
+        { id: "vo-view", label: "33 Kelulusan alat ganti", icon: Wrench, badge: "Awam" },
+        { id: "owner-desk", label: "34 Meja pemilik", icon: LayoutDashboard, badge: "HQ" },
+        { id: "photo-studio", label: "35 Studio gambar", icon: Camera, badge: "Foto" },
+        { id: "staff-performance", label: "36 Prestasi staf", icon: Award, badge: "Staf" },
+        { id: "crm", label: "37 CRM", icon: UserCheck, badge: "CRM" },
+        { id: "warranty", label: "38 Waranti", icon: AlertOctagon, badge: "Klaim" },
+        { id: "track", label: "39 Jejak awam", icon: Wrench, badge: "Jejak" },
+        { id: "passport", label: "40 Pasport awam", icon: FileText, badge: "Buku" },
+      ],
+    },
   ];
 
-  // Stesen 2: Kerani 1 Kaunter (Front Desk - PIN 3344)
+  // Stesen 2: Kerani 1 Kaunter (Front Desk)
   const kerani1Sections: NavSection[] = [
     {
       title: "Kaunter Hadapan & POS",
@@ -127,22 +143,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
       items: [
         { id: "customers", label: "Pangkalan Pelanggan", icon: UserCheck, badge: "CRM" },
         { id: "inbox", label: "Peti Mesej Pelanggan", icon: MessageSquare, badge: "Chat" },
-        { id: "campaigns", label: "Peringatan Servis", icon: Megaphone, badge: "Ingat" },
-        { id: "photo-kedai", label: "Gambar Motor & Resit", icon: Camera, badge: "Foto" },
-      ],
-    },
-    {
-      title: "Semakan Operasi Lain",
-      items: [
-        { id: "pit-live", label: "Lantai Pit Live", icon: Flame, badge: "Pit" },
-        { id: "inventory", label: "Baki Stok Stor", icon: Package, badge: "Stok" },
-        { id: "motor-sales", label: "Showroom Motosikal", icon: Bike, badge: "Unit" },
-        { id: "warranty-issues", label: "Semak Waranti", icon: AlertOctagon, badge: "Waranti" },
+        { id: "leads", label: "Pertanyaan Prospek Baharu", icon: Users, badge: "Leads" },
       ],
     },
   ];
 
-  // Stesen 3: Kerani 2 Stor (Inventori & Logistik - PIN 2233)
+  // Stesen 3: Kerani 2 Stor (Inventori & Logistik)
   const kerani2Sections: NavSection[] = [
     {
       title: "Pengurusan Stor & Alat Ganti",
@@ -152,61 +158,32 @@ export const Sidebar: React.FC<SidebarProps> = ({
         { id: "suppliers", label: "Pesanan Pembekal (PO)", icon: ClipboardList, badge: "PO" },
         { id: "ecommerce-orders", label: "Pesanan Kurier & Cetak AWB", icon: Truck, badge: "AWB" },
         { id: "authenticity", label: "Kod Siri Ketulenan", icon: ShieldCheck, badge: "Siri" },
-      ],
-    },
-    {
-      title: "Penyelarasan Servis & Kaunter",
-      items: [
         { id: "work-orders", label: "Kad Kerja Servis", icon: Wrench, badge: "Servis" },
-        { id: "pos-checkout", label: "Kasir POS", icon: ShoppingCart, badge: "POS" },
-        { id: "photo-kedai", label: "Gambar Barang Stor", icon: Camera, badge: "Foto" },
-        { id: "warranty-issues", label: "Alat Ganti Rosak (RMA)", icon: AlertOctagon, badge: "RMA" },
       ],
     },
   ];
 
-  // Stesen 4: Ketua Foreman (Lantai Bengkel - PIN 1122)
+  // Stesen 4: Ketua Foreman (Lantai Bengkel)
   const foremanSections: NavSection[] = [
     {
       title: "Lantai Bengkel 4-Bay Lif",
       items: [
         { id: "dashboard", label: "Meja Foreman", icon: LayoutDashboard, badge: "Pit" },
+        { id: "foreman-job", label: "Kerja di Lantai", icon: Wrench, badge: "Lantai" },
         { id: "pit-live", label: "Lantai Pit Lif (4-Bay Live)", icon: Flame, badge: "Live" },
         { id: "work-orders", label: "Kad Kerja Servis", icon: Wrench, badge: "Kerja" },
         { id: "photo-servis", label: "Gambar Servis Masuk", icon: Camera, badge: "Foto" },
-        { id: "passport", label: "Pasport Servis Motor", icon: FileText, badge: "Buku" },
-        { id: "track", label: "Jejak Servis Pelanggan", icon: Wrench, badge: "Jejak" },
-      ],
-    },
-    {
-      title: "Kualiti Fizikal & Waranti",
-      items: [
-        { id: "warranty-issues", label: "Tuntutan Waranti Kilang", icon: AlertOctagon, badge: "Klaim" },
-        { id: "authenticity", label: "Semak Kod Siri Asli", icon: ShieldCheck, badge: "Siri" },
-        { id: "express-intake", label: "Daftar Motor Masuk", icon: Zap, badge: "Intake" },
-        { id: "inventory", label: "Semak Stok Rak Stor", icon: Package, badge: "Alat" },
       ],
     },
   ];
 
-  // Stesen 5: Showroom & Ejen (PIN 5566)
+  // Stesen 5: Showroom & Ejen
   const affiliateSections: NavSection[] = [
     {
       title: "Showroom & Jualan Motor",
       items: [
         { id: "dashboard", label: "Papan Showroom", icon: LayoutDashboard, badge: "Sales" },
-        { id: "motor-sales", label: "Showroom Motosikal", icon: Bike, badge: "Unit" },
-        { id: "loan-pipeline", label: "Saluran Permohonan Loan", icon: Calculator, badge: "Loan" },
-        { id: "leads", label: "Pertanyaan Prospek Baharu", icon: Users, badge: "Leads" },
-        { id: "bike-locks", label: "Pengurusan Kunci & Sewa Beli", icon: Lock, badge: "Kunci" },
         { id: "affiliate", label: "Program Komisen Ejen", icon: Award, badge: "Ejen" },
-      ],
-    },
-    {
-      title: "Khidmat Pelanggan & Kaunter",
-      items: [
-        { id: "customers", label: "Pangkalan Pelanggan", icon: UserCheck, badge: "CRM" },
-        { id: "quotations", label: "Sebut Harga", icon: FileText, badge: "Harga" },
       ],
     },
   ];
@@ -239,6 +216,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     {
       title: "Lantai Pit Lif (4-Bay)",
       items: [
+        { id: "foreman-job", label: "Kerja di Lantai", icon: Wrench, badge: "Lantai" },
         { id: "pit-live", label: "Lantai Pit Lif (4-Bay Live)", icon: Flame, badge: "Pit" },
         { id: "photo-servis", label: "Gambar Servis Masuk", icon: Camera, badge: "Foreman" },
         { id: "warranty-issues", label: "Tuntutan Waranti Kilang", icon: AlertOctagon, badge: "Klaim" },

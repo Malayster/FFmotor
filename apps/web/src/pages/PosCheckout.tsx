@@ -207,10 +207,7 @@ export const PosCheckout: React.FC<PosCheckoutProps> = ({
   const [pettyCashAmount, setPettyCashAmount] = useState("");
   const [pettyCashReason, setPettyCashReason] = useState("Petrol Test Ride");
   const [pettyCashPerson, setPettyCashPerson] = useState("Sifu Halim");
-  const [pettyCashRecords, setPettyCashRecords] = useState<Array<{ id: string; time: string; amount: number; reason: string; person: string }>>([
-    { id: "pc-1", time: "10:15 AM", amount: 10, reason: "Petrol Ron95 Test Ride (Y15ZR)", person: "Sifu Halim" },
-    { id: "pc-2", time: "11:40 AM", amount: 15, reason: "Minyak Cuci Rantai & Kain Lap", person: "Aiman" }
-  ]);
+  const [pettyCashRecords, setPettyCashRecords] = useState<Array<{ id: string; time: string; amount: number; reason: string; person: string }>>([]);
 
   const totalPettyCashOut = pettyCashRecords.reduce((sum, r) => sum + r.amount, 0);
   const drawerFloat = 300; // Float pagi tunai

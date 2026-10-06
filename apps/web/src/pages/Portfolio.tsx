@@ -97,6 +97,11 @@ export const Portfolio: React.FC = () => {
 
   // Modal Deposit Motor
   const [selectedBikeForDeposit, setSelectedBikeForDeposit] = useState<MotorcycleUnit | null>(null);
+  const [saleKind, setSaleKind] = useState<"" | "baru" | "trade-in">("");
+  const [saleName, setSaleName] = useState("");
+  const [salePhone, setSalePhone] = useState("");
+  const [saleNote, setSaleNote] = useState("");
+  const [saleMsg, setSaleMsg] = useState("");
   const [depositForm, setDepositForm] = useState({
     name: "",
     phone: "",
@@ -165,9 +170,8 @@ export const Portfolio: React.FC = () => {
       const res = await fetch(`/api/public/track?plate=${encodeURIComponent(quickPlate.trim())}`);
       const d = await res.json();
       setTrackResult(d);
-      if (d.success) {
-        tactileAudio.success();
-      }
+      if (d.found) tactileAudio.success();
+      else tactileAudio.warningAlert?.();
     } catch (err) {
       toast.error("Ralat menyemak nombor plat.");
     } finally {
@@ -305,7 +309,7 @@ export const Portfolio: React.FC = () => {
       const d = await res.json();
       if (d.success) {
         tactileAudio.success();
-        toast.success("Slip deposit diterima! Unit dipegang 48 jam sementara semakan kaunter.");
+        toast.success(d.message || "Slip diterima. Unit belum dikunci sehingga kaunter sahkan.");
         setSelectedBikeForDeposit(null);
         setDepositForm({ name: "", phone: "", slipRef: "" });
         fetchCatalog();
@@ -593,7 +597,7 @@ export const Portfolio: React.FC = () => {
                 className="w-full p-3 rounded-xl bg-red-600 hover:bg-red-700 text-white font-black text-xs uppercase flex items-center justify-center gap-2 tracking-wider transition"
               >
                 <User className="w-4 h-4" />
-                <span>Akses Terminal Staf (PIN 1122/3344/2233/8899)</span>
+                <span>Akses Terminal Staf Bengkel</span>
               </a>
             </div>
 
@@ -752,14 +756,14 @@ export const Portfolio: React.FC = () => {
               {/* Paparan Keputusan Carian Telemetri */}
               {trackResult && (
                 <div className="p-4 rounded-2xl bg-zinc-50 border-2 border-zinc-300 space-y-3 animate-in fade-in duration-200">
-                  {trackResult.success ? (
+                  {trackResult.found ? (
                     <>
                       <div className="flex items-center justify-between pb-2 border-b border-zinc-200">
                         <span className="font-mono font-black text-sm text-red-600">
-                          {trackResult.plateNumber}
+                          {trackResult.plateNumber || quickPlate}
                         </span>
                         <span className="text-[10px] font-mono font-black px-2 py-0.5 rounded bg-emerald-100 text-emerald-800">
-                          {trackResult.vehicle?.model || "Motosikal Terdaftar"}
+                          {trackResult.vehicle?.model || "Rekod dijumpai"}
                         </span>
                       </div>
 
@@ -791,7 +795,7 @@ export const Portfolio: React.FC = () => {
                   ) : (
                     <div className="text-xs font-bold text-red-600 flex items-center gap-1.5">
                       <AlertCircle className="w-4 h-4 shrink-0" />
-                      <span>{trackResult.message || "Rekod nombor plat tidak dijumpai."}</span>
+                      <span>{trackResult.found === false ? (trackResult.message || "Rekod nombor plat tidak dijumpai.") : (trackResult.message || "Semakan gagal.")}</span>
                     </div>
                   )}
                 </div>
@@ -843,8 +847,12 @@ export const Portfolio: React.FC = () => {
               Motosikal Sedia Pandu Uji
             </h2>
             <p className="text-xs sm:text-sm text-zinc-600 font-bold">
-              Kunci unit impian anda dalam 48 jam dengan deposit hanya RM300 sementara semakan slip gaji.
+              Pilih jualan baru atau trade-in. Unit tidak bertukar milik sehingga kerani semak dokumen dan pengarah lulus.
             </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button type="button" onClick={() => { tactileAudio.click(); setSaleKind("baru"); }} className="px-4 py-2 rounded-xl bg-zinc-950 text-white text-xs font-black uppercase">Jualan baru</button>
+              <button type="button" onClick={() => { tactileAudio.click(); setSaleKind("trade-in"); }} className="px-4 py-2 rounded-xl bg-red-600 text-white text-xs font-black uppercase">Trade-in</button>
+            </div>
           </div>
 
           {/* Penapis Jenama & Kondisi */}
@@ -899,6 +907,28 @@ export const Portfolio: React.FC = () => {
             </div>
           </div>
         </div>
+
+        
+        {saleKind && (
+          <form className="bg-white border-4 border-zinc-950 rounded-3xl p-4 grid gap-3 sm:grid-cols-2" onSubmit={async (e) => {
+            e.preventDefault();
+            setSaleMsg("Menghantar...");
+            try {
+              const res = await fetch("/api/leads", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ customerName: saleName, customerPhone: salePhone, targetItem: saleNote, type: saleKind === "baru" ? "bike_purchase" : "trade_in", notes: saleKind }) });
+              const data = await res.json().catch(() => ({}));
+              setSaleMsg(res.ok ? "Permohonan direkod. Kerani akan semak. Unit belum terjual." : (data.message || "Ditolak."));
+            } catch {
+              setSaleMsg("Pelayan tidak menjawab.");
+            }
+          }}>
+            <p className="sm:col-span-2 text-sm font-black">{saleKind === "baru" ? "Permohonan jualan baru" : "Permohonan trade-in"}</p>
+            <input className="border-2 border-zinc-300 rounded-xl px-3 py-2 text-sm" placeholder="Nama" value={saleName} onChange={(e) => setSaleName(e.target.value)} required />
+            <input className="border-2 border-zinc-300 rounded-xl px-3 py-2 text-sm" placeholder="Telefon" value={salePhone} onChange={(e) => setSalePhone(e.target.value)} required />
+            <input className="sm:col-span-2 border-2 border-zinc-300 rounded-xl px-3 py-2 text-sm" placeholder={saleKind === "baru" ? "Unit yang diminta" : "Model motor trade-in dan tahun"} value={saleNote} onChange={(e) => setSaleNote(e.target.value)} required />
+            <button className="sm:col-span-2 rounded-xl bg-zinc-950 text-white text-xs font-black uppercase py-2" type="submit">Hantar kepada kerani</button>
+            {saleMsg && <p className="sm:col-span-2 text-xs font-bold">{saleMsg}</p>}
+          </form>
+        )}
 
         {/* Grid Kad Motosikal 3D */}
         {loading ? (
@@ -1419,7 +1449,7 @@ export const Portfolio: React.FC = () => {
           </div>
 
           <div className="space-y-2">
-            <h4 className="text-xs font-mono font-black uppercase tracking-wider text-red-500">Pautan Staf & Sistem</h4>
+            <h4 className="text-xs font-mono font-black uppercase tracking-wider text-red-500">Pautan Staf</h4>
             <ul className="text-xs space-y-1.5 text-zinc-400 font-bold">
               <li><a href="/#dashboard" className="hover:text-white transition">Terminal Staf PIN</a></li>
               <li><a href="/#pos-checkout" className="hover:text-white transition">Kaunter POS Checkout</a></li>
@@ -1498,9 +1528,9 @@ export const Portfolio: React.FC = () => {
             </div>
 
             <div className="p-4 rounded-2xl bg-zinc-950 text-white space-y-1.5">
-              <span className="text-[10px] font-mono text-zinc-400 uppercase block">Akaun Bank Rasmi FP Motor:</span>
-              <p className="font-mono text-sm font-black text-emerald-400">MAYBANK: 5520 8899 1234</p>
-              <p className="text-[11px] text-zinc-300 font-bold">PENAMA: G ONE STOP ENTERPRISE</p>
+              <span className="text-[10px] font-mono text-zinc-400 uppercase block">Deposit RM300</span>
+              <p className="text-sm font-black text-white">Bayar hanya ke akaun yang kaunter sahkan di WhatsApp.</p>
+              <p className="text-[11px] text-zinc-300 font-bold">Nombor akaun tidak dipaparkan di laman ini. Hantar rujukan slip selepas pemindahan.</p>
               <div className="pt-2 border-t border-zinc-800 flex justify-between text-xs">
                 <span className="text-zinc-400">Jumlah Deposit:</span>
                 <span className="font-mono font-black text-red-500">RM 300.00</span>
@@ -1540,6 +1570,7 @@ export const Portfolio: React.FC = () => {
                   value={depositForm.slipRef}
                   onChange={(e) => setDepositForm({ ...depositForm, slipRef: e.target.value })}
                   className="w-full bg-zinc-50 border-2 border-zinc-300 rounded-xl px-3 py-2 text-xs font-mono font-bold"
+                  minLength={4}
                   required
                 />
               </div>

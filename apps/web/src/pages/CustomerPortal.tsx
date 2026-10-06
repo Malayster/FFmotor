@@ -36,7 +36,14 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
   onOpenTrack,
   onOpenQuote,
 }) => {
-  const currentVehicle = vehicles[0] || {
+  const [customer, setCustomer] = useState<any>(() => {
+    try { return JSON.parse(localStorage.getItem("ffmotor_customer") || "null"); } catch { return null; }
+  });
+  const [phone, setPhone] = useState("");
+  const [pin, setPin] = useState("");
+  const [loginError, setLoginError] = useState("");
+  const [owned, setOwned] = useState<any[]>([]);
+  const currentVehicle = owned[0] || vehicles[0] || {
     plateNumber: "VDF 8899",
     brand: "Yamaha",
     model: "NVX 155 V2",
@@ -136,6 +143,33 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
     setAduanSubmitted(true);
     setAduanText("");
   };
+
+  if (!customer) {
+    return (
+      <form className="max-w-md mx-auto p-6 space-y-3" onSubmit={async (e) => {
+        e.preventDefault();
+        setLoginError("");
+        const res = await fetch("/api/public/customer/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ phone, pin }),
+        });
+        const data = await res.json();
+        if (!data.ok) { setLoginError(data.message || "Log masuk gagal."); return; }
+        localStorage.setItem("ffmotor_customer_token", data.token);
+        localStorage.setItem("ffmotor_customer", JSON.stringify(data.customer));
+        setOwned(data.vehicles || []);
+        setCustomer(data.customer);
+      }}>
+        <h1 className="text-xl font-black">Portal pelanggan</h1>
+        <p className="text-xs text-zinc-600">Masukkan telefon dan PIN pelanggan. Ini bukan PIN staf.</p>
+        <input className="w-full border rounded-xl px-3 py-2" placeholder="Telefon" value={phone} onChange={(e) => setPhone(e.target.value)} />
+        <input className="w-full border rounded-xl px-3 py-2" placeholder="PIN" type="password" value={pin} onChange={(e) => setPin(e.target.value)} />
+        {loginError && <p className="text-xs text-red-600 font-bold">{loginError}</p>}
+        <button className="w-full bg-zinc-950 text-white rounded-xl py-2 font-black" type="submit">Masuk</button>
+      </form>
+    );
+  }
 
   return (
     <div className="space-y-6 pb-12 max-w-4xl mx-auto">
