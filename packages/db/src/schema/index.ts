@@ -18,3 +18,5 @@ export * from "./item_shots";
 export * from "./capture_docs";
 export * from "./web_orders";
 
+export * from "./staff_sessions";
+export * from "./customer_access";
