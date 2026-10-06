@@ -40,16 +40,30 @@ function isKerani(_role?: string) {
   return true;
 }
 
+async function ensureWebOrdersColumns(db: any) {
+  try {
+    await db.$client.prepare("ALTER TABLE web_orders ADD COLUMN customer_email text").run().catch(() => null);
+    await db.$client.prepare("ALTER TABLE web_orders ADD COLUMN items text").run().catch(() => null);
+    await db.$client.prepare("ALTER TABLE web_orders ADD COLUMN amount real DEFAULT 0").run().catch(() => null);
+    await db.$client.prepare("ALTER TABLE web_orders ADD COLUMN tracking_history text").run().catch(() => null);
+    await db.$client.prepare("ALTER TABLE web_orders ADD COLUMN receipt_sent_at text").run().catch(() => null);
+    await db.$client.prepare("ALTER TABLE web_orders ADD COLUMN receipt_method text").run().catch(() => null);
+    await db.$client.prepare("ALTER TABLE web_orders ADD COLUMN updated_at text").run().catch(() => null);
+  } catch {}
+}
+
 bagRouter.post("/checkout", async (c) => {
   const body = await c.req.json();
   const name = String(body.name || "").trim();
   const phone = String(body.phone || "").trim();
+  const email = body.email || body.customerEmail ? String(body.email || body.customerEmail).trim() : null;
   const fulfillment = body.fulfillment === "delivery" ? "delivery" : "pickup";
   const address = String(body.address || "").trim();
   const lines = Array.isArray(body.lines) ? body.lines : [];
   if (!name || !phone || lines.length === 0) return c.json({ success: false, message: "Nama, telefon, dan sekurang-kurangnya satu barang wajib" }, 400);
   if (fulfillment === "delivery" && address.length < 8) return c.json({ success: false, message: "Alamat penghantaran wajib" }, 400);
   const db = createDb(c.env.DB);
+  await ensureWebOrdersColumns(db);
   const openOrders = await db.select().from(webOrders).all();
   const openIds = new Set(openOrders.filter((order) => order.status === "menunggu_semakan" || order.status === "sudah_bayar").map((order) => order.id));
   const openLines = (await db.select().from(webOrderLines).all()).filter((line) => openIds.has(line.orderId));
@@ -80,14 +94,36 @@ bagRouter.post("/checkout", async (c) => {
     }
   }
   if (saved.length === 0) return c.json({ success: false, message: "Beg kosong" }, 400);
+  const amount = saved.reduce((sum, item) => sum + (item.unitPrice * item.quantity), 0);
+  const initialTrackingHistory = JSON.stringify([
+    {
+      timestamp: now,
+      status: "menunggu_semakan",
+      note: "Pesanan beg kuning diterima. Menunggu semakan bayaran oleh kerani.",
+    },
+  ]);
+
   await db.insert(webOrders).values({
     id: orderId,
     customerName: name,
     customerPhone: phone,
+    customerEmail: email,
     address: fulfillment === "delivery" ? address : null,
+    items: JSON.stringify(saved),
+    amount,
     fulfillment,
     status: "menunggu_semakan",
+    paymentNote: null,
+    rejectReason: null,
+    trackingNumber: null,
+    trackingHistory: initialTrackingHistory,
+    handledBy: null,
+    paidAt: null,
+    closedAt: null,
+    receiptSentAt: null,
+    receiptMethod: null,
     createdAt: now,
+    updatedAt: now,
   });
   for (const line of saved) {
     await db.insert(webOrderLines).values({ id: `ln_${nanoid(8)}`, orderId, ...line });
@@ -98,6 +134,7 @@ bagRouter.post("/checkout", async (c) => {
 shopRouter.get("/today", async (c) => {
   if (!isKerani(me(c).role)) return c.json({ success: false, message: "Hanya kerani" }, 403);
   const db = createDb(c.env.DB);
+  await ensureWebOrdersColumns(db);
   const today = new Date().toISOString().slice(0, 10);
   const [orders, holds, slots, jobs, parts, alerts] = await Promise.all([
     db.select().from(webOrders).all(),
@@ -128,18 +165,50 @@ shopRouter.get("/today", async (c) => {
 shopRouter.get("/orders", async (c) => {
   if (!isKerani(me(c).role)) return c.json({ success: false, message: "Hanya kerani" }, 403);
   const db = createDb(c.env.DB);
+  await ensureWebOrdersColumns(db);
   const orders = await db.select().from(webOrders).all();
   const lines = await db.select().from(webOrderLines).all();
   const shots = await db.select().from(itemShots).all();
   return c.json({
     success: true,
-    orders: orders.sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map((order) => ({
-      ...order,
-      lines: lines.filter((line) => line.orderId === order.id).map((line) => ({
-        ...line,
-        image: shots.find((shot) => shot.subjectType === line.subjectType && shot.subjectId === line.subjectId && shot.slot === "depan")?.image || null,
-      })),
-    })),
+    orders: orders.sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map((order) => {
+      const orderLines = lines.filter((line) => line.orderId === order.id);
+      let parsedItems: any[] = [];
+      try {
+        if (order.items) parsedItems = JSON.parse(order.items);
+      } catch {}
+
+      const effectiveLines = orderLines.length > 0
+        ? orderLines.map((line) => ({
+            ...line,
+            image: shots.find((shot) => shot.subjectType === line.subjectType && shot.subjectId === line.subjectId && shot.slot === "depan")?.image || null,
+          }))
+        : parsedItems.map((item: any) => ({
+            id: `item_${nanoid(6)}`,
+            orderId: order.id,
+            subjectType: item.subjectType || "product",
+            subjectId: item.subjectId || "prod",
+            title: item.title || item.name || "Item",
+            unitPrice: Number(item.unitPrice || 0),
+            quantity: Number(item.quantity || 1),
+            videoUrl: null,
+            image: null,
+          }));
+
+      const calculatedAmount = order.amount || effectiveLines.reduce((acc, l) => acc + (Number(l.unitPrice) * Number(l.quantity)), 0);
+
+      let parsedTrackingHistory: any[] = [];
+      try {
+        if (order.trackingHistory) parsedTrackingHistory = JSON.parse(order.trackingHistory);
+      } catch {}
+
+      return {
+        ...order,
+        amount: calculatedAmount,
+        lines: effectiveLines,
+        trackingHistory: parsedTrackingHistory,
+      };
+    }),
   });
 });
 
@@ -148,12 +217,20 @@ shopRouter.post("/orders/:id/reject", async (c) => {
   if (!isKerani(user.role)) return c.json({ success: false, message: "Hanya kerani" }, 403);
   const body = await c.req.json();
   const reason = String(body.reason || "").trim();
-  if (reason.length < 3) return c.json({ success: false, message: "Nyatakan sebab" }, 400);
+  if (reason.length < 3) return c.json({ success: false, message: "Nyatakan sebab penolakan" }, 400);
   const db = createDb(c.env.DB);
+  await ensureWebOrdersColumns(db);
   const order = await db.select().from(webOrders).where(eq(webOrders.id, c.req.param("id"))).get();
   if (!order || order.status !== "menunggu_semakan") return c.json({ success: false, message: "Pesanan ini tidak menunggu semakan" }, 400);
-  await db.update(webOrders).set({ status: "ditolak", rejectReason: reason, handledBy: user.id, closedAt: new Date().toISOString() }).where(eq(webOrders.id, order.id));
-  return c.json({ success: true });
+  const now = new Date().toISOString();
+  await db.update(webOrders).set({
+    status: "ditolak",
+    rejectReason: reason,
+    handledBy: user.id,
+    closedAt: now,
+    updatedAt: now,
+  }).where(eq(webOrders.id, order.id));
+  return c.json({ success: true, message: "Pesanan ditolak" });
 });
 
 shopRouter.post("/orders/:id/pay", async (c) => {
@@ -163,34 +240,153 @@ shopRouter.post("/orders/:id/pay", async (c) => {
   const note = String(body.paymentNote || "").trim();
   if (note.length < 3) return c.json({ success: false, message: "Catat rujukan bayaran yang disemak" }, 400);
   const db = createDb(c.env.DB);
+  await ensureWebOrdersColumns(db);
   const order = await db.select().from(webOrders).where(eq(webOrders.id, c.req.param("id"))).get();
   if (!order || order.status !== "menunggu_semakan") return c.json({ success: false, message: "Pesanan ini tidak menunggu semakan" }, 400);
-  await db.update(webOrders).set({ status: "sudah_bayar", paymentNote: note, handledBy: user.id, paidAt: new Date().toISOString() }).where(eq(webOrders.id, order.id));
-  return c.json({ success: true });
+  const now = new Date().toISOString();
+  let history: any[] = [];
+  try {
+    if (order.trackingHistory) history = JSON.parse(order.trackingHistory);
+  } catch {}
+  history.push({ timestamp: now, status: "sudah_bayar", note: `Bayaran disahkan (${note})`, handledBy: user.id });
+
+  await db.update(webOrders).set({
+    status: "sudah_bayar",
+    paymentNote: note,
+    handledBy: user.id,
+    paidAt: now,
+    trackingHistory: JSON.stringify(history),
+    updatedAt: now,
+  }).where(eq(webOrders.id, order.id));
+  return c.json({ success: true, message: "Bayaran pesanan disahkan" });
 });
 
 shopRouter.post("/orders/:id/ship", async (c) => {
   const user = me(c);
   if (!isKerani(user.role)) return c.json({ success: false, message: "Hanya kerani" }, 403);
-  const tracking = String((await c.req.json()).trackingNumber || "").trim();
+  const body = await c.req.json();
+  const tracking = String(body.trackingNumber || "").trim();
+  const carrier = String(body.carrier || "J&T Express").trim();
   if (tracking.length < 4) return c.json({ success: false, message: "Nombor penjejakan kurier wajib" }, 400);
   const db = createDb(c.env.DB);
+  await ensureWebOrdersColumns(db);
   const order = await db.select().from(webOrders).where(eq(webOrders.id, c.req.param("id"))).get();
-  if (!order || order.status !== "sudah_bayar" || order.fulfillment !== "delivery") return c.json({ success: false, message: "Hanya pesanan hantar yang sudah dibayar" }, 400);
+  if (!order || order.status !== "sudah_bayar" || order.fulfillment !== "delivery") {
+    return c.json({ success: false, message: "Hanya pesanan hantar yang sudah dibayar boleh dihantar" }, 400);
+  }
   await closeStock(db, order.id);
-  await db.update(webOrders).set({ status: "dihantar", trackingNumber: tracking, handledBy: user.id, closedAt: new Date().toISOString() }).where(eq(webOrders.id, order.id));
-  return c.json({ success: true });
+  const now = new Date().toISOString();
+  let history: any[] = [];
+  try {
+    if (order.trackingHistory) history = JSON.parse(order.trackingHistory);
+  } catch {}
+  history.push({ timestamp: now, status: "dihantar", trackingNumber: tracking, carrier, handledBy: user.id });
+
+  await db.update(webOrders).set({
+    status: "dihantar",
+    trackingNumber: tracking,
+    trackingHistory: JSON.stringify(history),
+    handledBy: user.id,
+    closedAt: now,
+    updatedAt: now,
+  }).where(eq(webOrders.id, order.id));
+  return c.json({ success: true, message: "Pesanan telah dihantar melalui kurier" });
 });
 
 shopRouter.post("/orders/:id/handover", async (c) => {
   const user = me(c);
   if (!isKerani(user.role)) return c.json({ success: false, message: "Hanya kerani" }, 403);
   const db = createDb(c.env.DB);
+  await ensureWebOrdersColumns(db);
   const order = await db.select().from(webOrders).where(eq(webOrders.id, c.req.param("id"))).get();
-  if (!order || order.status !== "sudah_bayar" || order.fulfillment !== "pickup") return c.json({ success: false, message: "Hanya pesanan ambil sendiri yang sudah dibayar" }, 400);
+  if (!order || order.status !== "sudah_bayar" || order.fulfillment !== "pickup") {
+    return c.json({ success: false, message: "Hanya pesanan ambil sendiri yang sudah dibayar boleh diserahkan" }, 400);
+  }
   await closeStock(db, order.id);
-  await db.update(webOrders).set({ status: "diserahkan", handledBy: user.id, closedAt: new Date().toISOString() }).where(eq(webOrders.id, order.id));
-  return c.json({ success: true });
+  const now = new Date().toISOString();
+  let history: any[] = [];
+  try {
+    if (order.trackingHistory) history = JSON.parse(order.trackingHistory);
+  } catch {}
+  history.push({ timestamp: now, status: "diserahkan", note: "Barang telah diserahkan kepada pelanggan di kaunter", handledBy: user.id });
+
+  await db.update(webOrders).set({
+    status: "diserahkan",
+    trackingHistory: JSON.stringify(history),
+    handledBy: user.id,
+    closedAt: now,
+    updatedAt: now,
+  }).where(eq(webOrders.id, order.id));
+  return c.json({ success: true, message: "Pesanan telah berjaya diserahkan" });
+});
+
+shopRouter.post("/orders/:id/receipt", async (c) => {
+  const user = me(c);
+  if (!isKerani(user.role)) return c.json({ success: false, message: "Hanya kerani" }, 403);
+  const body = await c.req.json();
+  const method = body.receiptMethod === "email" ? "email" : "wasap";
+  const db = createDb(c.env.DB);
+  await ensureWebOrdersColumns(db);
+  const order = await db.select().from(webOrders).where(eq(webOrders.id, c.req.param("id"))).get();
+  if (!order) return c.json({ success: false, message: "Pesanan tidak dijumpai" }, 404);
+  const now = new Date().toISOString();
+  await db.update(webOrders).set({
+    receiptSentAt: now,
+    receiptMethod: method,
+    updatedAt: now,
+  }).where(eq(webOrders.id, order.id));
+
+  const digits = order.customerPhone.replace(/\D/g, "");
+  const wa = digits.startsWith("0") ? `6${digits}` : digits;
+  const msgText = encodeURIComponent(
+    `Salam hormat ${order.customerName},\n\n` +
+    `Resit rasmi pesanan Beg Kuning anda *${order.id}* di *FFmotor*:\n\n` +
+    `Jumlah: *RM ${(order.amount || 0).toFixed(2)}*\n` +
+    `Kaedah: *${order.fulfillment === "delivery" ? "Penghantaran Kurier" : "Ambil Sendiri di Bengkel"}*\n` +
+    `Status: *${order.status.toUpperCase()}*\n` +
+    (order.trackingNumber ? `No. Tracking: *${order.trackingNumber}*\n` : "") +
+    `\nTerima kasih atas sokongan anda kepada FFmotor!`
+  );
+
+  return c.json({
+    success: true,
+    receiptSentAt: now,
+    receiptMethod: method,
+    waUrl: `https://wa.me/${wa}?text=${msgText}`,
+  });
+});
+
+shopRouter.post("/orders/:id/tracking", async (c) => {
+  const user = me(c);
+  if (!isKerani(user.role)) return c.json({ success: false, message: "Hanya kerani" }, 403);
+  const body = await c.req.json();
+  const trackingNumber = String(body.trackingNumber || "").trim();
+  const statusNote = String(body.statusNote || "").trim();
+  const db = createDb(c.env.DB);
+  await ensureWebOrdersColumns(db);
+  const order = await db.select().from(webOrders).where(eq(webOrders.id, c.req.param("id"))).get();
+  if (!order) return c.json({ success: false, message: "Pesanan tidak dijumpai" }, 404);
+  const now = new Date().toISOString();
+  let history: any[] = [];
+  try {
+    if (order.trackingHistory) history = JSON.parse(order.trackingHistory);
+  } catch {}
+  if (statusNote || trackingNumber) {
+    history.push({
+      timestamp: now,
+      trackingNumber: trackingNumber || order.trackingNumber,
+      note: statusNote || "Kemas kini status penjejakan",
+      handledBy: user.id,
+    });
+  }
+
+  await db.update(webOrders).set({
+    trackingNumber: trackingNumber || order.trackingNumber,
+    trackingHistory: JSON.stringify(history),
+    updatedAt: now,
+  }).where(eq(webOrders.id, order.id));
+
+  return c.json({ success: true, trackingNumber: trackingNumber || order.trackingNumber, trackingHistory: history });
 });
 
 async function closeStock(db: ReturnType<typeof createDb>, orderId: string) {
