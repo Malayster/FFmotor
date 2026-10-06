@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { Product, WorkOrder } from "../types";
 import { getPartImage } from "../utils/spikeAssets";
+import { sessionHeader } from "../lib/api";
 
 const LABOR_RATES: { name: string; rate: number; category: string }[] = [
   { name: 'Servis Minyak & Penapis', rate: 10, category: 'Servis Biasa' },
@@ -159,11 +160,11 @@ export const PosCheckout: React.FC<PosCheckoutProps> = ({
     try {
       const res = await fetch(`/api/work-orders/${wo.id}/pay`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...sessionHeader() },
         body: JSON.stringify({ paymentMethod: methodStr }),
       });
-      const data = await res.json();
-      if (data.success) {
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.success) {
         const receiptData = {
           receiptNo: `REC-WO-${wo.woNumber.replace(/[^0-9]/g, "").slice(-4) || Date.now().toString().slice(-4)}`,
           time: new Date().toLocaleString("ms-MY"),
@@ -193,7 +194,8 @@ export const PosCheckout: React.FC<PosCheckoutProps> = ({
         setIsServiceBillOpen(false);
         if (onRefreshWorkOrders) onRefreshWorkOrders();
       } else {
-        alert("Ralat memproses bayaran: " + (data.message || "Gagal"));
+        const errMsg = data.error?.message || data.message || "Gagal memproses bayaran di pelayan";
+        alert("Ralat memproses bayaran: " + errMsg);
       }
     } catch (err: any) {
       alert("Ralat rangkaian: " + err.message);
@@ -262,7 +264,7 @@ export const PosCheckout: React.FC<PosCheckoutProps> = ({
     if (newProd) {
       await fetch(`/api/products/${newProd.id}/adjust-stock`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...sessionHeader() },
         body: JSON.stringify({ delta: -1 }),
       }).catch(() => null);
     }
@@ -412,7 +414,7 @@ export const PosCheckout: React.FC<PosCheckoutProps> = ({
       // Simpan rekod transaksi ke D1
       await fetch("/api/finance/closing/close", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...sessionHeader() },
         body: JSON.stringify({
           cashierId: "usr_cashier",
           totalActualCash: cashNum,
@@ -425,7 +427,7 @@ export const PosCheckout: React.FC<PosCheckoutProps> = ({
         if (item.product?.id) {
           await fetch(`/api/products/${item.product.id}/adjust-stock`, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: { "Content-Type": "application/json", ...sessionHeader() },
             body: JSON.stringify({ delta: -Math.abs(item.qty || 1) }),
           }).catch(() => null);
         }

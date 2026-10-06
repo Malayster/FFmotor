@@ -449,7 +449,7 @@ export class WorkshopService {
         plateNumber: vehicles.plateNumber,
       })
       .from(workOrders)
-      .innerJoin(vehicles, eq(workOrders.vehicleId, vehicles.id))
+      .leftJoin(vehicles, eq(workOrders.vehicleId, vehicles.id))
       .where(eq(workOrders.id, workOrderId))
       .all();
 
@@ -478,32 +478,36 @@ export class WorkshopService {
       .run();
 
     // 2. Rekod komisen mekanik secara automatik jika mekanik ditugaskan & ada upah buruh
-    if (wo.mechanicId && (wo.totalLaborAmount || 0) > 0) {
-      const existingComm = await this.db
-        .select()
-        .from(mechanicCommissions)
-        .where(eq(mechanicCommissions.workOrderId, workOrderId))
-        .all();
+    try {
+      if (wo.mechanicId && (wo.totalLaborAmount || 0) > 0) {
+        const existingComm = await this.db
+          .select()
+          .from(mechanicCommissions)
+          .where(eq(mechanicCommissions.workOrderId, workOrderId))
+          .all();
 
-      if (existingComm.length === 0) {
-        const commRate = 15; // 15% standard commission
-        const commAmount = Math.round((wo.totalLaborAmount * (commRate / 100)) * 100) / 100;
-        await this.db
-          .insert(mechanicCommissions)
-          .values({
-            id: `comm_${nanoid(8)}`,
-            mechanicId: wo.mechanicId,
-            workOrderId,
-            workOrderNumber: wo.woNumber,
-            plateNumber: wo.plateNumber,
-            laborTotal: wo.totalLaborAmount,
-            commissionPercent: commRate,
-            commissionAmount: commAmount,
-            status: "accrued",
-            createdAt: now,
-          })
-          .run();
+        if (existingComm.length === 0) {
+          const commRate = 15; // 15% standard commission
+          const commAmount = Math.round((wo.totalLaborAmount * (commRate / 100)) * 100) / 100;
+          await this.db
+            .insert(mechanicCommissions)
+            .values({
+              id: `comm_${nanoid(8)}`,
+              mechanicId: wo.mechanicId,
+              workOrderId,
+              workOrderNumber: wo.woNumber,
+              plateNumber: wo.plateNumber || "Motosikal",
+              laborTotal: wo.totalLaborAmount,
+              commissionPercent: commRate,
+              commissionAmount: commAmount,
+              status: "accrued",
+              createdAt: now,
+            })
+            .run();
+        }
       }
+    } catch (commErr) {
+      console.warn("Ralat merekod komisen mekanik (tidak menghalang transaksi bayaran):", commErr);
     }
 
     return {

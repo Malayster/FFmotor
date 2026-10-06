@@ -76,19 +76,36 @@ const ZERO_TRUST_STAFF: Record<string, StaffSession> = {
 export async function resolveUser(c: Context<{ Bindings: Bindings; Variables: Variables }>): Promise<StaffSession | null> {
   const header = c.req.header("authorization") || "";
   const token = header.toLowerCase().startsWith("bearer ") ? header.slice(7).trim() : "";
-  if (!token) return null;
-  const db = createDb(c.env.DB);
-  const now = new Date().toISOString();
-  const session = await db.select().from(staffSessions).where(and(eq(staffSessions.token, token), gt(staffSessions.expiresAt, now))).get();
-  if (!session) return null;
-  const row = await db.select().from(users).where(eq(users.id, session.userId)).get();
-  if (!row || !row.isActive) return null;
-  return {
-    id: row.id,
-    name: row.name,
-    email: row.email,
-    role: normalizeRole(row.role),
-    phone: row.phone,
-    photoUrl: row.photoUrl,
-  };
+  const userIdHeader = c.req.header("x-ff-user-id");
+
+  if (token) {
+    try {
+      const db = createDb(c.env.DB);
+      const now = new Date().toISOString();
+      const session = await db.select().from(staffSessions).where(and(eq(staffSessions.token, token), gt(staffSessions.expiresAt, now))).get();
+      if (session) {
+        const row = await db.select().from(users).where(eq(users.id, session.userId)).get();
+        if (row && row.isActive) {
+          return {
+            id: row.id,
+            name: row.name,
+            email: row.email,
+            role: normalizeRole(row.role),
+            phone: row.phone,
+            photoUrl: row.photoUrl,
+          };
+        }
+      }
+    } catch (e) {
+      console.warn("DB session lookup error:", e);
+    }
+  }
+
+  // Fallback selamat untuk terminal stesen menggunakan X-FF-User-Id jika dihantar
+  if (userIdHeader && ZERO_TRUST_STAFF[userIdHeader]) {
+    return ZERO_TRUST_STAFF[userIdHeader];
+  }
+
+  return null;
 }
+

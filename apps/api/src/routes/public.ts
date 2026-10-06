@@ -11,9 +11,19 @@ export const publicRouter = new Hono<{ Bindings: Bindings; Variables: Variables 
 // Ciri 1: Halaman Awam Digital Motorcycle Passport (/passport/:plate)
 publicRouter.get("/passport/:plate", async (c) => {
   const db = createDb(c.env.DB);
-  const plateNorm = c.req.param("plate").toUpperCase().replace(/\s+/g, "");
+  const rawPlate = c.req.param("plate") || "";
+  const plateNorm = decodeURIComponent(rawPlate).toUpperCase().replace(/[^A-Z0-9]/g, "");
 
-  const vehList = await db.select().from(vehicles).where(eq(vehicles.plateNormalized, plateNorm)).all();
+  const vehList = await db
+    .select()
+    .from(vehicles)
+    .where(
+      or(
+        eq(vehicles.plateNormalized, plateNorm),
+        sql`REPLACE(UPPER(${vehicles.plateNumber}), ' ', '') = ${plateNorm}`
+      )
+    )
+    .all();
   const vehicle = vehList[0];
 
   if (!vehicle) {
@@ -25,6 +35,7 @@ publicRouter.get("/passport/:plate", async (c) => {
     .select({
       id: workOrders.id,
       woNumber: workOrders.woNumber,
+      status: workOrders.status,
       mileageIn: workOrders.mileageIn,
       customerComplaint: workOrders.customerComplaint,
       mechanicNotes: workOrders.mechanicNotes,
@@ -33,7 +44,7 @@ publicRouter.get("/passport/:plate", async (c) => {
     })
     .from(workOrders)
     .where(eq(workOrders.vehicleId, vehicle.id))
-    .orderBy(desc(workOrders.completedAt))
+    .orderBy(desc(workOrders.createdAt))
     .all();
 
   // Ambil semua part yang telah dipasang

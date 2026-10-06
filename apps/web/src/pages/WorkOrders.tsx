@@ -431,13 +431,47 @@ export const WorkOrders: React.FC<WorkOrdersProps> = ({
     }
   };
 
-  const handleSendWhatsApp = (wo: WorkOrder, kind: "status" | "ready") => {
+  const handleSendWhatsApp = async (wo: WorkOrder, kind: "approval" | "status" | "ready") => {
     const currentHost = typeof window !== "undefined" ? window.location.origin : "http://localhost:3000";
     const passportUrl = `${currentHost}/#passport-${wo.plateNumber?.replace(/\s+/g, "")}`;
 
-    const msg = kind === "status"
-      ? WhatsAppTemplates.serviceUpdate(wo.ownerName || "Pelanggan", wo.plateNumber || "", wo.status.toUpperCase())
-      : WhatsAppTemplates.motorReady(wo.ownerName || "Pelanggan", wo.plateNumber || "", wo.grandTotal || 0, passportUrl);
+    // Muat turun item pecahan jika belum ada dalam memori
+    let items = selectedWO?.id === wo.id ? selectedWoItems : [];
+    if (items.length === 0) {
+      try {
+        const res = await fetch(`/api/work-orders/${wo.id}/items`, { headers: sessionHeader() });
+        const d = await res.json();
+        if (d.success && d.items) items = d.items;
+      } catch {
+        // Teruskan jika gagal muat item
+      }
+    }
+
+    const calculatedTotal = items.length > 0
+      ? items.reduce((acc, i) => acc + (Number(i.totalPrice) || (Number(i.unitPrice) * Number(i.quantity))), 0)
+      : (wo.grandTotal || 0);
+
+    let msg = "";
+    if (kind === "ready" || wo.status === "ready") {
+      msg = WhatsAppTemplates.motorReady(wo.ownerName || "Pelanggan", wo.plateNumber || "", calculatedTotal, passportUrl);
+    } else if (kind === "approval" || (wo.status !== "completed" && items.length > 0)) {
+      msg = WhatsAppTemplates.preWorkApproval(
+        wo.ownerName || "Pelanggan",
+        wo.plateNumber || "",
+        `${wo.brand || ""} ${wo.model || ""}`.trim(),
+        wo.customerComplaint || "",
+        items,
+        calculatedTotal
+      );
+    } else {
+      msg = WhatsAppTemplates.serviceUpdate(
+        wo.ownerName || "Pelanggan",
+        wo.plateNumber || "",
+        wo.status.toUpperCase(),
+        items,
+        calculatedTotal
+      );
+    }
 
     const link = createWhatsAppLink(wo.ownerPhone || "0123456789", msg);
     window.open(link, "_blank");
@@ -920,11 +954,12 @@ export const WorkOrders: React.FC<WorkOrdersProps> = ({
 
                             <button
                               type="button"
-                              onClick={() => handleSendWhatsApp(wo, wo.status === "ready" ? "ready" : "status")}
-                              className="spike-btn-dark text-[10px] py-1 px-1.5 text-emerald-400 hover:text-red-600 flex items-center gap-0.5"
-                              title="Hantar WhatsApp"
+                              onClick={() => handleSendWhatsApp(wo, wo.status === "ready" ? "ready" : "approval")}
+                              className="spike-btn-dark text-[10px] py-1 px-1.5 text-emerald-400 hover:text-emerald-300 flex items-center gap-0.5"
+                              title={wo.status === "ready" ? "Hantar Notis Motor Siap (WhatsApp)" : "Hantar Senarai Alat Ganti & Minta Kelulusan (WhatsApp)"}
                             >
                               <MessageSquare className="w-3 h-3" />
+                              <span>{wo.status === "ready" ? "Siap" : "Wasap"}</span>
                             </button>
 
                             <button
@@ -1341,8 +1376,19 @@ export const WorkOrders: React.FC<WorkOrdersProps> = ({
                         Upah Buruh: <span className="font-mono text-zinc-950">RM {selectedWoItems.filter(i => i.itemType === "labor").reduce((acc, i) => acc + (Number(i.totalPrice) || Number(i.unitPrice) * Number(i.quantity)), 0).toFixed(2)}</span>
                       </span>
                     </div>
-                    <div className="text-sm font-black text-red-600">
-                      Grand Total: RM {selectedWoItems.reduce((acc, i) => acc + (Number(i.totalPrice) || Number(i.unitPrice) * Number(i.quantity)), 0).toFixed(2)}
+                    <div className="flex items-center gap-3">
+                      <div className="text-sm font-black text-red-600">
+                        Grand Total: RM {selectedWoItems.reduce((acc, i) => acc + (Number(i.totalPrice) || Number(i.unitPrice) * Number(i.quantity)), 0).toFixed(2)}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => selectedWO && handleSendWhatsApp(selectedWO, "approval")}
+                        className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs flex items-center gap-1.5 shadow-sm transition active:scale-95 cursor-pointer"
+                        title="Hantar sebut harga alat ganti & upah ke WhatsApp pelanggan untuk kebenaran sebelum kerja dimulakan"
+                      >
+                        <MessageSquare className="w-3.5 h-3.5" />
+                        <span>Minta Kelulusan Pelanggan (WhatsApp)</span>
+                      </button>
                     </div>
                   </div>
                 </div>

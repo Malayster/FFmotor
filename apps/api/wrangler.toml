@@ -1,0 +1,20 @@
+name = "fpmotor-api"
+main = "src/index.ts"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+
+# Cloudflare D1 Database (Fresh production fpmotor_db)
+[[d1_databases]]
+binding = "DB"
+database_name = "fpmotor_db"
+database_id = "520f84a6-b666-4c5f-a3fb-c7a329d870f0"
+migrations_dir = "../../packages/db/migrations"
+
+# Cloudflare R2 Bucket (Fresh production fpmotor-assets)
+[[r2_buckets]]
+binding = "BUCKET"
+bucket_name = "fpmotor-assets"
+
+# Cloudflare Cron Triggers (Setiap malam jam 2 pagi kira ramalan mileage & peringatan servis)
+[triggers]
+crons = ["0 2 * * *"]

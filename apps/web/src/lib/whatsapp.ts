@@ -33,11 +33,65 @@ export const WhatsAppTemplates = {
     `Rekod servis & Sijil Kesihatan Motor Digital anda boleh disemak di:\n${passportUrl}\n\n` +
     `Boleh datang ambil bila-bila masa. Terima kasih!`,
 
-  // Kemaskini status servis semasa
-  serviceUpdate: (ownerName: string, plateNumber: string, status: string) =>
-    `Salam ${ownerName}, kemaskini terkini motor anda *${plateNumber}* di *FFmotor*:\n\n` +
-    `Status semasa: *${status}*\n\n` +
-    `Sebarang pertanyaan, sila hubungi kaunter kami. Terima kasih!`,
+  // Kelulusan sebut harga sebelum mula kerja (Senarai alat ganti, upah & jumlah harga)
+  preWorkApproval: (
+    ownerName: string,
+    plateNumber: string,
+    model: string,
+    complaint: string,
+    items: Array<{ description: string; quantity: number; unitPrice: number; totalPrice?: number; itemType?: string }>,
+    grandTotal: number
+  ) => {
+    let partsListText = "";
+    if (items && items.length > 0) {
+      partsListText = items
+        .map((item, idx) => {
+          const typeBadge = item.itemType === "labor" ? "[Upah]" : "[Part]";
+          const total = (item.totalPrice ?? (item.unitPrice * item.quantity)).toFixed(2);
+          return `${idx + 1}. ${typeBadge} *${item.description}* (x${item.quantity}) = RM ${total}`;
+        })
+        .join("\n");
+    } else {
+      partsListText = "- Pemeriksaan & diagnosis asas di pit.";
+    }
+
+    return (
+      `Salam ${ownerName || "Tuan/Puan"}, sebut harga & pelan pembaikan motor anda *${plateNumber}* (${model || "Motosikal"}) di *FFmotor*:\n\n` +
+      `📌 *Aduan / Masalah Dikesan:*\n_${complaint || "Pemeriksaan am berkala"}_\n\n` +
+      `🔧 *Senarai Cadangan Alat Ganti & Upah:*\n${partsListText}\n\n` +
+      `💰 *JUMLAH ANGGARAN KESELURUHAN:* *RM ${grandTotal.toFixed(2)}*\n\n` +
+      `⚡ *TINDAKAN DIPERLUKAN:*\n` +
+      `Sila balas *SETUJU* pada mesej WhatsApp ini bagi memberi kebenaran untuk mekanik kami memulakan pemasangan alat ganti di pit bengkel.\n\n` +
+      `Sebarang pertanyaan, sila hubungi kaunter kami. Terima kasih!\n*— Pasukan Khidmat FFmotor*`
+    );
+  },
+
+  // Kemaskini status servis semasa beserta senarai alat ganti & jumlah harga jika ada
+  serviceUpdate: (
+    ownerName: string,
+    plateNumber: string,
+    status: string,
+    items?: Array<{ description: string; quantity: number; unitPrice: number; totalPrice?: number; itemType?: string }>,
+    grandTotal?: number
+  ) => {
+    let partsBlock = "";
+    if (items && items.length > 0) {
+      const partsList = items
+        .map((item, idx) => {
+          const typeBadge = item.itemType === "labor" ? "[Upah]" : "[Part]";
+          const total = (item.totalPrice ?? (item.unitPrice * item.quantity)).toFixed(2);
+          return `${idx + 1}. ${typeBadge} ${item.description} (x${item.quantity}) = RM ${total}`;
+        })
+        .join("\n");
+      partsBlock = `\n\n🔧 *Item / Alat Ganti Terlibat:*\n${partsList}\n💰 *Jumlah Semasa:* *RM ${(grandTotal || 0).toFixed(2)}*`;
+    }
+
+    return (
+      `Salam ${ownerName || "Tuan/Puan"}, kemaskini terkini motor anda *${plateNumber}* di *FFmotor*:\n\n` +
+      `Status semasa: *${status}*${partsBlock}\n\n` +
+      `Sebarang pertanyaan, sila hubungi kaunter kami. Terima kasih!`
+    );
+  },
 
   // Makluman menunggu alat ganti
   waitingParts: (ownerName: string, plateNumber: string, partName: string) =>

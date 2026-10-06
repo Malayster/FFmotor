@@ -17,6 +17,7 @@ import { LivePitRadar } from "../components/pit/LivePitRadar";
 import { PremiseFloorplan } from "../components/premise/PremiseFloorplan";
 import { MobileActionDock } from "../components/navigation/MobileActionDock";
 import { tactileAudio } from "../lib/audio";
+import { Passport } from "./Passport";
 
 type Shot = { slot: string; label?: string | null; image: string };
 
@@ -74,6 +75,7 @@ export const Portfolio: React.FC = () => {
   const [quickPlate, setQuickPlate] = useState("");
   const [trackResult, setTrackResult] = useState<any>(null);
   const [searchingPlate, setSearchingPlate] = useState(false);
+  const [viewingPassportPlate, setViewingPassportPlate] = useState<string | null>(null);
 
   // Semakan Kod Siri Keaslian Barangan
   const [serialInput, setSerialInput] = useState("");
@@ -158,6 +160,19 @@ export const Portfolio: React.FC = () => {
   useEffect(() => {
     fetchSlots(slotDate);
   }, [slotDate]);
+
+  useEffect(() => {
+    const handleHash = () => {
+      const h = window.location.hash;
+      if (h.startsWith("#passport-")) {
+        const plate = decodeURIComponent(h.replace("#passport-", "")).trim();
+        if (plate) setViewingPassportPlate(plate);
+      }
+    };
+    handleHash();
+    window.addEventListener("hashchange", handleHash);
+    return () => window.removeEventListener("hashchange", handleHash);
+  }, []);
 
   // Carian Pantas Status Servis / Pasport
   const handleQuickTrack = async (e: React.FormEvent) => {
@@ -411,6 +426,7 @@ export const Portfolio: React.FC = () => {
           {/* Navigasi Utama Desktop */}
           <nav className="hidden lg:flex items-center gap-6 text-xs font-black uppercase tracking-wider">
             <a href="#showroom" onClick={() => tactileAudio.click()} className="hover:text-red-500 transition-colors">Showroom Motor</a>
+            <a href="#jejak" onClick={() => tactileAudio.click()} className="text-red-500 hover:text-red-400 transition-colors flex items-center gap-1 font-black"><ShieldCheck className="w-3.5 h-3.5" /> Pasport & Servis</a>
             <a href="#katalog" onClick={() => tactileAudio.click()} className="text-amber-400 hover:text-amber-300 transition-colors flex items-center gap-1 font-black"><ShoppingBag className="w-3.5 h-3.5" /> Katalog & Beg Kuning</a>
             <a href="#dyno-stage" onClick={() => tactileAudio.click()} className="hover:text-red-500 transition-colors">Simulator Dyno</a>
             <a href="#pit-radar" onClick={() => tactileAudio.click()} className="hover:text-red-500 transition-colors">Radar 4-Bay</a>
@@ -485,6 +501,21 @@ export const Portfolio: React.FC = () => {
                 <div className="flex items-center gap-3">
                   <Bike className="w-4 h-4 text-red-500" />
                   <span>Showroom Motosikal</span>
+                </div>
+                <ChevronRight className="w-4 h-4 text-zinc-400" />
+              </a>
+
+              <a
+                href="#jejak"
+                onClick={() => {
+                  tactileAudio.click();
+                  setIsMobileMenuOpen(false);
+                }}
+                className="flex items-center justify-between px-4 py-3 rounded-xl bg-zinc-900 hover:bg-red-600 text-white font-black text-sm uppercase tracking-wide transition border border-zinc-800"
+              >
+                <div className="flex items-center gap-3">
+                  <ShieldCheck className="w-4 h-4 text-red-500" />
+                  <span>Pasport & Rekod Servis</span>
                 </div>
                 <ChevronRight className="w-4 h-4 text-zinc-400" />
               </a>
@@ -656,6 +687,15 @@ export const Portfolio: React.FC = () => {
               {/* Butang Tindakan Pantas */}
               <div className="flex flex-wrap items-center gap-3 pt-2">
                 <a
+                  href="#jejak"
+                  onClick={() => tactileAudio.click()}
+                  className="px-6 py-3.5 rounded-2xl bg-zinc-900 border-2 border-red-600 hover:bg-zinc-800 text-white font-black text-xs uppercase tracking-wider transition shadow-lg flex items-center gap-2 cursor-pointer active:scale-95"
+                >
+                  <ShieldCheck className="w-4 h-4 text-red-500" />
+                  <span>Semak Pasport & Rekod Servis</span>
+                </a>
+
+                <a
                   href="#showroom"
                   className="px-6 py-3.5 rounded-2xl bg-red-600 hover:bg-red-700 text-white font-black text-xs uppercase tracking-wider transition shadow-lg flex items-center gap-2 cursor-pointer active:scale-95"
                 >
@@ -783,13 +823,19 @@ export const Portfolio: React.FC = () => {
                       )}
 
                       {trackResult.passportUrl && (
-                        <a
-                          href={trackResult.passportUrl}
-                          className="inline-flex items-center gap-1.5 text-xs font-black text-red-600 hover:underline pt-1"
-                        >
-                          <span>Buka Pasport Digital Rasmi</span>
-                          <ExternalLink className="w-3 h-3" />
-                        </a>
+                        <div className="pt-2 border-t border-zinc-200">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              tactileAudio.click();
+                              setViewingPassportPlate(trackResult.plateNumber || quickPlate);
+                            }}
+                            className="w-full py-2.5 px-4 rounded-xl bg-red-600 hover:bg-red-700 text-white font-black text-xs uppercase tracking-wider transition flex items-center justify-center gap-2 cursor-pointer shadow-md active:scale-95"
+                          >
+                            <Wrench className="w-4 h-4" />
+                            <span>Buka Buku Servis Digital & Pasport Lengkap</span>
+                          </button>
+                        </div>
                       )}
                     </>
                   ) : (
@@ -1788,6 +1834,43 @@ export const Portfolio: React.FC = () => {
           setIsCartOpen(true);
         }}
       />
+
+      {/* 11. MODAL DIGITAL PASSPORT & SEJARAH SERVIS (PLAN A) */}
+      {viewingPassportPlate && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
+          <div className="relative w-full max-w-3xl bg-white rounded-3xl border-4 border-zinc-950 p-5 sm:p-8 max-h-[92vh] overflow-y-auto space-y-6 text-zinc-950 shadow-2xl">
+            <div className="flex items-center justify-between pb-3 border-b-2 border-zinc-200">
+              <div className="flex items-center gap-2.5">
+                <ShieldCheck className="w-6 h-6 text-red-600 shrink-0" />
+                <div>
+                  <h2 className="text-base sm:text-lg font-black uppercase text-zinc-950">
+                    Buku Servis Digital & Pasport Motosikal
+                  </h2>
+                  <p className="text-[11px] text-zinc-800 font-bold">
+                    Rekod Penyelenggaraan Rasmi FFmotor (G One Stop Ent)
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  tactileAudio.click();
+                  setViewingPassportPlate(null);
+                }}
+                className="p-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-950 transition cursor-pointer"
+                title="Tutup Paparan Pasport"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <Passport
+              plate={viewingPassportPlate}
+              onBack={() => setViewingPassportPlate(null)}
+            />
+          </div>
+        </div>
+      )}
 
     </div>
   );
