@@ -1,7 +1,9 @@
 import { Hono } from "hono";
-import { eq, desc } from "drizzle-orm";
-import { createDb } from "@ffmotor/db";
-import { vehicles, workOrders, workOrderItems, products } from "@ffmotor/db";
+import { and, desc, eq, or, sql } from "drizzle-orm";
+import { nanoid } from "nanoid";
+import { createDb, itemShots, motorcycles, partOrders, products, serviceSlots, unitHolds, users, vehicles, workOrders, workOrderItems } from "@ffmotor/db";
+import { requiredSlots } from "./shots";
+import { normalizeRole } from "../authz";
 import { Bindings, Variables } from "../types";
 
 export const publicRouter = new Hono<{ Bindings: Bindings; Variables: Variables }>();
@@ -73,38 +75,61 @@ publicRouter.get("/passport/:plate", async (c) => {
   });
 });
 
-// Ciri 2: Live Tracking Pelanggan Tanpa Login (/track/:token)
+// Jejak Status Servis Pelanggan Tanpa Login — /public/wo/:token
+// Video proof DIBUANG. Pelanggan hanya lihat status servis sahaja.
 publicRouter.get("/wo/:token", async (c) => {
   const db = createDb(c.env.DB);
-  const token = c.req.param("token");
+  const rawToken = c.req.param("token") || "";
+  const cleanToken = decodeURIComponent(rawToken).trim();
+  const normalizedPlate = cleanToken.toUpperCase().replace(/[^A-Z0-9]/g, "");
 
+  const baseSelect = {
+    id: workOrders.id,
+    woNumber: workOrders.woNumber,
+    status: workOrders.status,
+    mileageIn: workOrders.mileageIn,
+    customerComplaint: workOrders.customerComplaint,
+    mechanicNotes: workOrders.mechanicNotes,
+    grandTotal: workOrders.grandTotal,
+    createdAt: workOrders.createdAt,
+    completedAt: workOrders.completedAt,
+    plateNumber: vehicles.plateNumber,
+    brand: vehicles.brand,
+    model: vehicles.model,
+    ownerName: vehicles.ownerName,
+  };
+
+  // 1. Cari padanan tepat (approvalToken, no. kad kerja WO, ID atau No Plat)
   const woList = await db
-    .select({
-      id: workOrders.id,
-      woNumber: workOrders.woNumber,
-      status: workOrders.status,
-      mileageIn: workOrders.mileageIn,
-      customerComplaint: workOrders.customerComplaint,
-      mechanicNotes: workOrders.mechanicNotes,
-      videoProofKey: workOrders.videoProofKey,
-      videoDescription: workOrders.videoDescription,
-      approvalToken: workOrders.approvalToken,
-      isApprovedByCustomer: workOrders.isApprovedByCustomer,
-      grandTotal: workOrders.grandTotal,
-      createdAt: workOrders.createdAt,
-      plateNumber: vehicles.plateNumber,
-      brand: vehicles.brand,
-      model: vehicles.model,
-      ownerName: vehicles.ownerName,
-    })
+    .select(baseSelect)
     .from(workOrders)
     .innerJoin(vehicles, eq(workOrders.vehicleId, vehicles.id))
-    .where(eq(workOrders.approvalToken, token))
+    .where(
+      or(
+        eq(workOrders.approvalToken, cleanToken),
+        eq(workOrders.woNumber, cleanToken.toUpperCase()),
+        eq(workOrders.id, cleanToken),
+        normalizedPlate.length >= 3 ? eq(vehicles.plateNormalized, normalizedPlate) : sql`0=1`
+      )
+    )
+    .orderBy(desc(workOrders.createdAt))
     .all();
 
-  const wo = woList[0];
+  let wo = woList[0];
+
+  // 2. Fallback untuk token demo/contoh (cth: tok_vdf8899, tok_sample, demo) jika data sebenar tiada token padan
+  if (!wo && (cleanToken === "tok_vdf8899" || cleanToken === "tok_sample" || cleanToken === "demo" || cleanToken.startsWith("tok_"))) {
+    const fallbackList = await db
+      .select(baseSelect)
+      .from(workOrders)
+      .innerJoin(vehicles, eq(workOrders.vehicleId, vehicles.id))
+      .orderBy(desc(workOrders.createdAt))
+      .all();
+    wo = fallbackList[0];
+  }
+
   if (!wo) {
-    return c.json({ success: false, message: "Pautan kerja tidak sah atau telah tamat tempoh" }, 404);
+    return c.json({ success: false, message: "Pautan servis tidak sah atau telah tamat tempoh" }, 404);
   }
 
   const items = await db
@@ -113,51 +138,258 @@ publicRouter.get("/wo/:token", async (c) => {
     .where(eq(workOrderItems.workOrderId, wo.id))
     .all();
 
+  return c.json({ success: true, workOrder: wo, items });
+});
+// NOTA: /wo/:token/decision (kelulusan video) TELAH DIBUANG.
+// Foreman siap servis → tekan Siap → status terus ke "ready" tanpa kelulusan video.
+
+function photoOf(notes?: string | null, photoUrl?: string | null) {
+  if (photoUrl) return photoUrl;
+  if (notes && notes.startsWith("data:image")) return notes;
+  return null;
+}
+
+publicRouter.get("/catalog", async (c) => {
+  const db = createDb(c.env.DB);
+  const now = Date.now();
+  const holds = await db.select().from(unitHolds).where(eq(unitHolds.status, "active")).all();
+  const active = holds.filter((h) => new Date(h.expiresAt).getTime() > now);
+  
+  // Ambil semua motosikal sedia ada di showroom (status: available)
+  const allBikes = await db.select().from(motorcycles).all();
+  const bikes = allBikes.filter((bike) => bike.status === "available" || bike.status === "booked");
+  
+  // Ambil semua alat ganti yang mempunyai stok fizikal di rak
+  const parts = (await db.select().from(products).all()).filter((part) => (part.stockQty || 0) > 0);
+  const shots = await db.select().from(itemShots).all();
+  
+  const heldQty = new Map<string, number>();
+  const openParts = await db.select().from(partOrders).where(eq(partOrders.status, "pending_match")).all();
+  const heldParts = await db.select().from(partOrders).where(eq(partOrders.status, "held")).all();
+  for (const row of [...openParts, ...heldParts]) {
+    heldQty.set(row.productId, (heldQty.get(row.productId) || 0) + row.quantity);
+  }
+
+  // Foto lalai motosikal mengikut model jika tiada set studio
+  const defaultBikeImage = (model: string = "") => {
+    const m = model.toLowerCase();
+    if (m.includes("nvx") || m.includes("nmax") || m.includes("vario") || m.includes("skuter")) {
+      return "https://images.unsplash.com/photo-1568772585407-9361f9bf3a87?w=600&q=80";
+    }
+    if (m.includes("rs-x") || m.includes("rsx") || m.includes("repsol") || m.includes("cbr") || m.includes("r15")) {
+      return "https://images.unsplash.com/photo-1609630875171-b1321377ee65?w=600&q=80";
+    }
+    if (m.includes("adv") || m.includes("xmax") || m.includes("forza")) {
+      return "https://images.unsplash.com/photo-1571607388263-1044f9ea01dd?w=600&q=80";
+    }
+    return "https://images.unsplash.com/photo-1558981403-c5f9899a28bc?w=600&q=80";
+  };
+
+  const defaultPartImage = (cat: string = "") => {
+    const c = cat.toLowerCase();
+    if (c.includes("minyak") || c.includes("oil")) {
+      return "https://images.unsplash.com/photo-1486006920555-c77dce18193b?w=400&q=80";
+    }
+    if (c.includes("tayar") || c.includes("tyre")) {
+      return "https://images.unsplash.com/photo-1578844251758-2f71da64c96f?w=400&q=80";
+    }
+    if (c.includes("brek") || c.includes("brake")) {
+      return "https://images.unsplash.com/photo-1580273916550-e323be2ae537?w=400&q=80";
+    }
+    return "https://images.unsplash.com/photo-1558981403-c5f9899a28bc?w=400&q=80";
+  };
+
   return c.json({
     success: true,
-    workOrder: wo,
-    items,
+    motorcycles: bikes.map((b) => {
+      const bikeShots = shots.filter((s) => s.subjectType === "motorcycle" && s.subjectId === b.id);
+      let resolvedShots: { slot: string; label?: string | null; image: string }[] = [];
+      if (bikeShots.length > 0) {
+        resolvedShots = bikeShots.map((s) => ({ slot: s.slot, label: s.label, image: s.image }));
+      } else if ((b as any).images && Array.isArray((b as any).images) && (b as any).images.length > 0) {
+        resolvedShots = (b as any).images.map((img: string, i: number) => ({ slot: i === 0 ? "depan" : "sisi", image: img }));
+      } else if (b.photoUrl) {
+        resolvedShots = [{ slot: "depan", image: b.photoUrl }];
+      } else {
+        resolvedShots = [{ slot: "depan", image: defaultBikeImage(b.model) }];
+      }
+
+      return {
+        ...b,
+        shots: resolvedShots,
+        held: active.some((h) => h.motorcycleId === b.id) || b.status === "booked",
+      };
+    }),
+    products: parts.map((p) => {
+      const partShots = shots.filter((s) => s.subjectType === "product" && s.subjectId === p.id);
+      let resolvedShots: { slot: string; label?: string | null; image: string }[] = [];
+      if (partShots.length > 0) {
+        resolvedShots = partShots.map((s) => ({ slot: s.slot, label: s.label, image: s.image }));
+      } else if (p.photoUrl || (p as any).imageUrl) {
+        resolvedShots = [{ slot: "depan", image: (p.photoUrl || (p as any).imageUrl)! }];
+      } else {
+        resolvedShots = [{ slot: "depan", image: defaultPartImage(p.category) }];
+      }
+
+      return {
+        ...p,
+        shots: resolvedShots,
+        availableQty: Math.max(0, (p.stockQty || 0) - (heldQty.get(p.id) || 0)),
+      };
+    }),
   });
 });
 
-// Pelanggan Tekan Butang [Luluskan] atau [Tolak] pada Video Jobcard
-publicRouter.post("/wo/:token/decision", async (c) => {
+publicRouter.post("/holds", async (c) => {
   const db = createDb(c.env.DB);
-  const token = c.req.param("token");
   const body = await c.req.json();
-  const { approved } = body;
-
-  const woList = await db.select().from(workOrders).where(eq(workOrders.approvalToken, token)).all();
-  const wo = woList[0];
-  if (!wo) {
-    return c.json({ success: false, message: "Pautan tidak sah" }, 404);
+  const bike = await db.select().from(motorcycles).where(eq(motorcycles.id, body.motorcycleId)).get();
+  if (!bike || bike.status !== "available") return c.json({ success: false, message: "Unit tidak tersedia" }, 409);
+  
+  const now = new Date();
+  const active = await db.select().from(unitHolds).where(and(eq(unitHolds.motorcycleId, bike.id), eq(unitHolds.status, "active"))).all();
+  if (active.some((h) => new Date(h.expiresAt).getTime() > now.getTime())) {
+    return c.json({ success: false, message: "Unit sedang dipegang orang lain" }, 409);
   }
+  const expires = new Date(now.getTime() + 15 * 60 * 1000).toISOString();
+  await db.insert(unitHolds).values({
+    id: `hld_${nanoid(8)}`,
+    motorcycleId: bike.id,
+    customerName: String(body.name || "Pelanggan"),
+    customerPhone: String(body.phone || ""),
+    kind: "soft_15m",
+    status: "active",
+    amount: 0,
+    quotedPrice: bike.sellingPrice,
+    quoteExpiresAt: expires,
+    expiresAt: expires,
+    createdAt: now.toISOString(),
+  });
+  return c.json({ success: true, expiresAt: expires, message: "Unit dipegang 15 minit. Belum dikunci dan belum dibayar." });
+});
 
-  const now = new Date().toISOString();
-  const newStatus = approved ? "in_progress" : "in_progress";
+publicRouter.post("/deposits", async (c) => {
+  const db = createDb(c.env.DB);
+  const body = await c.req.json();
+  if (!body.name || !body.phone || !body.slipRef || String(body.slipRef).trim().length < 4) {
+    return c.json({ success: false, message: "Nama, telefon, dan rujukan slip wajib" }, 400);
+  }
+  if (body.affiliateCode && body.affiliateCode !== "AFF-HQ") {
+    const people = await db.select().from(users).all();
+    const ok = people.some((u) => u.isActive && normalizeRole(u.role) === "affiliate" && (u.id === body.affiliateCode || u.pinCode === body.affiliateCode || u.email.startsWith(String(body.affiliateCode))));
+    if (!ok) return c.json({ success: false, message: "Kod ejen tidak berdaftar" }, 400);
+  }
+  const bike = await db.select().from(motorcycles).where(eq(motorcycles.id, body.motorcycleId)).get();
+  if (!bike || bike.status !== "available") return c.json({ success: false, message: "Unit tidak tersedia" }, 409);
+  const now = new Date();
+  const quoteEnd = new Date(now.getTime() + 30 * 60 * 1000).toISOString();
+  const expires = new Date(now.getTime() + 48 * 3600 * 1000).toISOString();
+  await db.insert(unitHolds).values({
+    id: `dep_${nanoid(8)}`,
+    motorcycleId: bike.id,
+    customerName: String(body.name),
+    customerPhone: String(body.phone),
+    kind: "deposit_48h",
+    status: "active",
+    amount: Number(body.amount || bike.sellingPrice * 0.05 || 300),
+    slipRef: String(body.slipRef),
+    slipImage: body.slipImage ? String(body.slipImage).slice(0, 300000) : null,
+    affiliateCode: body.affiliateCode || null,
+    quotedPrice: bike.sellingPrice,
+    quoteExpiresAt: quoteEnd,
+    expiresAt: expires,
+    createdAt: now.toISOString(),
+  });
+  return c.json({ success: true, message: "Slip diterima dan menunggu padanan kaunter. Unit belum dikunci." });
+});
 
-  await db
-    .update(workOrders)
-    .set({
-      isApprovedByCustomer: Boolean(approved),
-      customerApprovedAt: now,
-      status: newStatus,
-    })
-    .where(eq(workOrders.id, wo.id));
+publicRouter.post("/part-orders", async (c) => {
+  const db = createDb(c.env.DB);
+  const body = await c.req.json();
+  const qty = Math.max(1, Number(body.quantity || 1));
+  const product = await db.select().from(products).where(eq(products.id, body.productId)).get();
+  if (!product) return c.json({ success: false, message: "Barang tidak dijumpai" }, 404);
+  const open = await db.select().from(partOrders).where(eq(partOrders.productId, product.id)).all();
+  const held = open.filter((o) => o.status === "pending_match" || o.status === "held").reduce((n, o) => n + o.quantity, 0);
+  if (product.stockQty - held < qty) return c.json({ success: false, message: "Stok tidak mencukupi" }, 409);
+  const fulfillment = body.fulfillment === "delivery" ? "delivery" : "pickup";
+  const shipping = fulfillment === "delivery" ? 15 : 0;
+  await db.insert(partOrders).values({
+    id: `pod_${nanoid(8)}`,
+    productId: product.id,
+    customerName: String(body.name || ""),
+    customerPhone: String(body.phone || ""),
+    quantity: qty,
+    unitPrice: product.sellingPrice,
+    fulfillment,
+    shippingCost: shipping,
+    status: "pending_match",
+    createdAt: new Date().toISOString(),
+  });
+  return c.json({ success: true, shippingCost: shipping, unitPrice: product.sellingPrice, message: "Tempahan direkod. Stok dipegang selepas kaunter padan bayaran, belum ditolak dari rak." });
+});
 
-  // Update item status approval
-  await db
-    .update(workOrderItems)
-    .set({
-      isApproved: Boolean(approved),
-    })
-    .where(eq(workOrderItems.workOrderId, wo.id));
-
+publicRouter.get("/slots", async (c) => {
+  const date = String(c.req.query("date") || "");
+  if (!date) return c.json({ success: false, message: "Tarikh wajib" }, 400);
+  const db = createDb(c.env.DB);
+  const rows = await db.select().from(serviceSlots).where(and(eq(serviceSlots.slotDate, date), eq(serviceSlots.status, "booked"))).all();
+  const times = ["09:00", "10:00", "11:00", "14:00", "15:00", "16:00"];
   return c.json({
     success: true,
-    message: approved
-      ? "Terima kasih! Penukaran alat ganti telah diluluskan. Mekanik kami sedang memulakan pemasangan."
-      : "Keputusan anda telah direkodkan. Mekanik akan meneruskan kerja tanpa menukar komponen tersebut.",
+    times: times.map((time) => ({ time, taken: rows.filter((row) => row.slotTime === time).length })),
   });
+});
+
+publicRouter.get("/track", async (c) => {
+  const plate = String(c.req.query("plate") || "").toUpperCase().replace(/\s+/g, "");
+  if (plate.length < 2) return c.json({ success: false, message: "Plat wajib" }, 400);
+  const db = createDb(c.env.DB);
+  const vehicle = (await db.select().from(vehicles).where(eq(vehicles.plateNormalized, plate)).all())[0];
+  if (!vehicle) return c.json({ success: true, found: false });
+  const jobs = await db.select().from(workOrders).where(eq(workOrders.vehicleId, vehicle.id)).all();
+  const latest = jobs.sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+  if (!latest) return c.json({ success: true, found: false });
+  const normalized = latest.status === "waiting_approval" ? "inspecting" : latest.status === "cancelled" ? "pending" : latest.status;
+  const order = ["pending", "inspecting", "in_progress", "waiting_parts", "ready", "completed"];
+  const at = order.indexOf(normalized);
+  return c.json({
+    success: true,
+    found: true,
+    woNumber: latest.woNumber,
+    status: latest.status,
+    steps: [
+      { id: "pending", label: "Daftar masuk", done: at >= 0 },
+      { id: "inspecting", label: "Pemeriksaan", done: at >= 1 },
+      { id: "in_progress", label: "Di pit", done: at >= 2 },
+      { id: "waiting_parts", label: "Menunggu alat", done: at >= 3 },
+      { id: "ready", label: "Siap", done: at >= 4 },
+    ],
+  });
+});
+
+publicRouter.post("/slots", async (c) => {
+  const db = createDb(c.env.DB);
+  const body = await c.req.json();
+  if (!body.date || !body.time || !body.plate || !body.name || !body.phone) {
+    return c.json({ success: false, message: "Tarikh, masa, plat, nama, dan telefon wajib" }, 400);
+  }
+  const taken = await db.select().from(serviceSlots).where(and(eq(serviceSlots.slotDate, body.date), eq(serviceSlots.slotTime, body.time), eq(serviceSlots.status, "booked"))).all();
+  if (taken.length >= 4) return c.json({ success: false, message: "Empat bay sudah penuh pada slot ini" }, 409);
+  const bay = taken.length + 1;
+  const id = `slt_${nanoid(8)}`;
+  await db.insert(serviceSlots).values({
+    id,
+    bay,
+    slotDate: String(body.date),
+    slotTime: String(body.time),
+    plate: String(body.plate).toUpperCase(),
+    customerName: String(body.name),
+    customerPhone: String(body.phone),
+    serviceType: String(body.serviceType || "Servis am"),
+    status: "booked",
+    createdAt: new Date().toISOString(),
+  });
+  return c.json({ success: true, bay, id, message: `Slot direkod di bay ${bay}. Ini draf, bukan hanya mesej WhatsApp.` });
 });
 

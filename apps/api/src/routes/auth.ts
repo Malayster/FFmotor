@@ -1,45 +1,52 @@
 import { Hono } from "hono";
-import { eq } from "drizzle-orm";
+import { z } from "zod";
+import { zValidator } from "@hono/zod-validator";
 import { createDb } from "@ffmotor/db";
-import { users } from "@ffmotor/db";
 import { Bindings, Variables } from "../types";
+import { AuthService } from "../services/auth.service";
 
 export const authRouter = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
-authRouter.post("/login", async (c) => {
+const loginSchema = z.object({
+  email: z.string().email("Format emel tidak sah"),
+  password: z.string().min(1, "Kata laluan diperlukan"),
+});
+
+const zeroTrustSchema = z.object({
+  pin: z.string().optional(),
+  cfAccessEmail: z.string().email().optional(),
+  requestedRole: z.string().optional(),
+});
+
+authRouter.post("/login", zValidator("json", loginSchema), async (c) => {
   const db = createDb(c.env.DB);
-  const body = await c.req.json();
-  const { email, password } = body;
+  const authService = new AuthService(db);
+  const { email, password } = c.req.valid("json");
 
-  const userList = await db.select().from(users).where(eq(users.email, email)).all();
-  const user = userList[0];
+  const result = await authService.loginWithEmail(email, password);
+  return c.json({ success: true, ...result });
+});
 
-  if (!user || user.passwordHash !== password) {
-    return c.json({ success: false, message: "Email atau kata laluan tidak sah" }, 401);
-  }
+const verifyStationHandler = async (c: any) => {
+  const db = createDb(c.env.DB);
+  const authService = new AuthService(db);
+  const body = c.req.valid("json");
 
-  return c.json({
-    success: true,
-    user: {
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      phone: user.phone,
-    },
-    token: `demo_token_${user.id}`,
+  const cfAccessEmail = c.req.header("cf-access-authenticated-user-email") || body.cfAccessEmail;
+  const ip = c.req.header("cf-connecting-ip") || "127.0.0.1";
+  const country = c.req.header("cf-ipcountry") || "MY";
+
+  const result = await authService.verifyPinOrZeroTrust({
+    pin: body.pin,
+    cfAccessEmail,
+    requestedRole: body.requestedRole,
+    ip,
+    country,
   });
-});
 
-authRouter.get("/users", async (c) => {
-  const db = createDb(c.env.DB);
-  const allUsers = await db.select({
-    id: users.id,
-    name: users.name,
-    email: users.email,
-    role: users.role,
-    phone: users.phone,
-  }).from(users).all();
-  return c.json({ success: true, users: allUsers });
-});
+  return c.json({ success: true, ...result });
+};
 
+authRouter.post("/zero-trust/verify", zValidator("json", zeroTrustSchema), verifyStationHandler);
+authRouter.post("/station/verify", zValidator("json", zeroTrustSchema), verifyStationHandler);
+authRouter.post("/pin/verify", zValidator("json", zeroTrustSchema), verifyStationHandler);

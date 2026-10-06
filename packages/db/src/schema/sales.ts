@@ -13,6 +13,11 @@ export const motorcycles = sqliteTable("motorcycles", {
   currentMileage: integer("current_mileage").default(0), // Untuk used motor
   costPrice: real("cost_price").notNull().default(0),
   sellingPrice: real("selling_price").notNull().default(0),
+  plateNumber: text("plate_number"),
+  photoUrl: text("photo_url"),
+  videoUrl: text("video_url"),
+  listingStatus: text("listing_status", { enum: ["draf", "menunggu_mandor", "menunggu_foreman", "menunggu_harga", "dijual"] }).notNull().default("draf"),
+  listingNote: text("listing_note"),
   status: text("status", { enum: ["available", "booked", "loan_pending", "sold"] }).notNull().default("available"),
   notes: text("notes"),
   createdAt: text("created_at").notNull(),

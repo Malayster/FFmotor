@@ -1,0 +1,2 @@
+/api/*  https://fpmotor-api.espims.workers.dev/api/:splat  200
+/*      /index.html                                          200

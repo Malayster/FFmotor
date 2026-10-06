@@ -27,18 +27,21 @@ export interface WorkOrder {
   model?: string;
   ownerName?: string;
   ownerPhone?: string;
-  status: "pending" | "inspecting" | "in_progress" | "waiting_approval" | "waiting_parts" | "ready" | "completed" | "cancelled";
+  // waiting_approval DIBUANG — aliran kerja kini: in_progress → ready (Foreman QC fizikal)
+  status: "pending" | "inspecting" | "in_progress" | "waiting_parts" | "ready" | "completed" | "cancelled";
   mileageIn: number;
   customerComplaint: string;
   mechanicNotes?: string;
-  videoProofKey?: string;
-  videoDescription?: string;
-  approvalToken: string;
-  isApprovedByCustomer?: boolean | null;
+  safetyFlags?: string;
+  approvalToken?: string; // Kekal untuk pautan jejak pelanggan sahaja (bukan video)
   totalPartsAmount?: number;
   totalLaborAmount?: number;
   grandTotal: number;
   paymentStatus: "unpaid" | "partial" | "paid";
+  assignedBay?: number;
+  mechanicId?: string;
+  mechanicName?: string;
+  keyTag?: string;
   createdAt: string;
   completedAt?: string;
 }
@@ -64,11 +67,17 @@ export interface Product {
   category: string;
   brand: string;
   costPrice: number;
+  markupPct?: number;
   sellingPrice: number;
   stockQty: number;
   minAlertQty: number;
   rackLocation: string;
+  binLocation?: string;
+  grade?: 'OEM' | 'Aftermarket' | 'Terpakai';
   isHighValue: boolean;
+  moq?: number; // Minimum Order Quantity
+  imageUrl?: string;
+  aliases?: string[]; // Dialek & nama pasar (cth: ["matgat", "mudguard", "fender"])
 }
 
 export interface Motorcycle {
@@ -85,6 +94,11 @@ export interface Motorcycle {
   sellingPrice: number;
   status: "available" | "booked" | "loan_pending" | "sold";
   notes?: string;
+  images?: string[];
+  shotLabels?: string[];
+  depositMin?: number;
+  monthlyEstimated?: number;
+  specs?: string[];
 }
 
 export interface Lead {

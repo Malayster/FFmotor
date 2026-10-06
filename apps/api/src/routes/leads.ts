@@ -50,24 +50,28 @@ leadsRouter.post("/", async (c) => {
 });
 
 // Kemaskini Status Lead
-leadsRouter.patch("/:id/status", async (c) => {
+const updateLeadHandler = async (c: any) => {
   const db = createDb(c.env.DB);
   const id = c.req.param("id");
   const body = await c.req.json();
   const { status, notes } = body;
 
   const now = new Date().toISOString();
+  const updateData: any = { updatedAt: now };
+  if (status !== undefined) updateData.status = status;
+  if (notes !== undefined) updateData.notes = notes;
+
   await db
     .update(leads)
-    .set({
-      status,
-      notes: notes !== undefined ? notes : undefined,
-      updatedAt: now,
-    })
+    .set(updateData)
     .where(eq(leads.id, id));
 
   return c.json({ success: true, message: "Status prospek berjaya dikemaskini" });
-});
+};
+
+leadsRouter.patch("/:id/status", updateLeadHandler);
+leadsRouter.patch("/:id", updateLeadHandler);
+leadsRouter.put("/:id", updateLeadHandler);
 
 // Ciri 3: Predictive Parts Booking (Senarai ramalan & tempahan automatik)
 leadsRouter.get("/predictive-forecasts", async (c) => {
@@ -99,6 +103,6 @@ leadsRouter.get("/predictive-forecasts", async (c) => {
     .orderBy(predictiveBookings.predictedServiceDate)
     .all();
 
-  return c.json({ success: true, forecasts: list });
+  return c.json({ success: true, forecasts: list, data: list });
 });
 

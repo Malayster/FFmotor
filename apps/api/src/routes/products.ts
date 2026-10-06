@@ -1,128 +1,95 @@
 import { Hono } from "hono";
-import { eq, desc, like } from "drizzle-orm";
+import { z } from "zod";
+import { zValidator } from "@hono/zod-validator";
 import { createDb } from "@ffmotor/db";
-import { products, productSerials } from "@ffmotor/db";
-import { nanoid } from "nanoid";
 import { Bindings, Variables } from "../types";
+import { InventoryService } from "../services/inventory.service";
 
 export const productsRouter = new Hono<{ Bindings: Bindings; Variables: Variables }>();
+
+const addProductSchema = z.object({
+  sku: z.string().min(1, "SKU diperlukan"),
+  barcode: z.string().nullable().optional(),
+  name: z.string().min(1, "Nama produk diperlukan"),
+  category: z.string().min(1, "Kategori diperlukan"),
+  brand: z.string().optional(),
+  costPrice: z.coerce.number().optional(),
+  sellingPrice: z.coerce.number().optional(),
+  stockQty: z.coerce.number().optional(),
+  minAlertQty: z.coerce.number().optional(),
+  rackLocation: z.string().optional(),
+  isHighValue: z.boolean().optional(),
+});
+
+const adjustStockSchema = z.object({
+  delta: z.coerce.number(),
+  rackLocation: z.string().optional(),
+});
+
+const serialSchema = z.object({
+  serialNumber: z.string().min(1, "Nombor siri diperlukan"),
+  batchNo: z.string().optional(),
+  supplierName: z.string().optional(),
+});
 
 // Senarai produk & carian
 productsRouter.get("/", async (c) => {
   const db = createDb(c.env.DB);
-  const q = c.req.query("q")?.toLowerCase();
+  const inventory = new InventoryService(db);
+  const q = c.req.query("q");
   const category = c.req.query("category");
-
-  let list = await db.select().from(products).orderBy(products.category, products.name).all();
-
-  if (category && category !== "all") {
-    list = list.filter((p) => p.category === category);
-  }
-
-  if (q) {
-    list = list.filter(
-      (p) =>
-        p.name.toLowerCase().includes(q) ||
-        p.sku.toLowerCase().includes(q) ||
-        (p.barcode && p.barcode.includes(q)) ||
-        p.rackLocation.toLowerCase().includes(q)
-    );
-  }
-
+  const list = await inventory.listProducts({ query: q, category });
   return c.json({ success: true, products: list });
 });
 
 // Tambah produk baharu
-productsRouter.post("/", async (c) => {
+productsRouter.post("/", zValidator("json", addProductSchema), async (c) => {
   const db = createDb(c.env.DB);
-  const body = await c.req.json();
-  const { sku, barcode, name, category, brand, costPrice, sellingPrice, stockQty, minAlertQty, rackLocation, isHighValue } = body;
-
-  if (!sku || !name || !category) {
-    return c.json({ success: false, message: "SKU, Nama dan Kategori diperlukan" }, 400);
-  }
-
-  const now = new Date().toISOString();
-  const newProduct = {
-    id: `prod_${nanoid(8)}`,
-    sku: sku.toUpperCase().trim(),
-    barcode: barcode || null,
-    name,
-    category,
-    brand: brand || "Generik",
-    costPrice: costPrice ? parseFloat(costPrice) : 0,
-    sellingPrice: sellingPrice ? parseFloat(sellingPrice) : 0,
-    stockQty: stockQty ? parseInt(stockQty) : 0,
-    minAlertQty: minAlertQty ? parseInt(minAlertQty) : 5,
-    rackLocation: rackLocation || "RAK-A1",
-    isHighValue: Boolean(isHighValue),
-    createdAt: now,
-    updatedAt: now,
-  };
-
-  await db.insert(products).values(newProduct);
+  const inventory = new InventoryService(db);
+  const body = c.req.valid("json");
+  const newProduct = await inventory.addProduct(body);
   return c.json({ success: true, product: newProduct }, 201);
 });
 
 // Kemaskini stok masuk / laras stok
-productsRouter.post("/:id/adjust-stock", async (c) => {
+productsRouter.post("/:id/adjust-stock", zValidator("json", adjustStockSchema), async (c) => {
   const db = createDb(c.env.DB);
+  const inventory = new InventoryService(db);
+  const id = c.req.param("id");
+  const { delta, rackLocation } = c.req.valid("json");
+  const result = await inventory.adjustStock(id, delta, rackLocation);
+  return c.json({ success: true, ...result });
+});
+
+// Kemas kini maklumat produk (Nama, Harga Jual, Kos, Lokasi Rak, dll)
+const updateProductHandler = async (c: any) => {
+  const db = createDb(c.env.DB);
+  const inventory = new InventoryService(db);
   const id = c.req.param("id");
   const body = await c.req.json();
-  const { delta, rackLocation } = body;
+  const updated = await inventory.updateProduct(id, body);
+  return c.json({ success: true, product: updated });
+};
 
-  const prodList = await db.select().from(products).where(eq(products.id, id)).all();
-  const prod = prodList[0];
-  if (!prod) return c.json({ success: false, message: "Produk tidak dijumpai" }, 404);
+productsRouter.patch("/:id", updateProductHandler);
+productsRouter.put("/:id", updateProductHandler);
 
-  const newQty = Math.max(0, prod.stockQty + parseInt(delta || 0));
-  const now = new Date().toISOString();
-
-  await db
-    .update(products)
-    .set({
-      stockQty: newQty,
-      rackLocation: rackLocation || prod.rackLocation,
-      updatedAt: now,
-    })
-    .where(eq(products.id, id));
-
-  return c.json({ success: true, stockQty: newQty });
+// Dapatkan senarai kod siri untuk produk tertentu
+productsRouter.get("/:id/serials", async (c) => {
+  const db = createDb(c.env.DB);
+  const inventory = new InventoryService(db);
+  const id = c.req.param("id");
+  const serials = await inventory.listSerials(id);
+  return c.json({ success: true, serials });
 });
 
 // Daftar kod siri keaslian untuk produk tertentu
-productsRouter.post("/:id/serials", async (c) => {
+productsRouter.post("/:id/serials", zValidator("json", serialSchema), async (c) => {
   const db = createDb(c.env.DB);
+  const inventory = new InventoryService(db);
   const id = c.req.param("id");
-  const body = await c.req.json();
-  const { serialNumber, batchNo, supplierName } = body;
-
-  if (!serialNumber) {
-    return c.json({ success: false, message: "Kod siri diperlukan" }, 400);
-  }
-
-  const cleanSerial = serialNumber.toUpperCase().trim();
-  const existing = await db.select().from(productSerials).where(eq(productSerials.serialNumber, cleanSerial)).all();
-  if (existing.length > 0) {
-    return c.json({ success: false, message: "Kod siri ini sudah wujud dalam pangkalan data!" }, 400);
-  }
-
-  const now = new Date().toISOString();
-  const newSerial = {
-    id: `ser_${nanoid(8)}`,
-    productId: id,
-    serialNumber: cleanSerial,
-    batchNo: batchNo || "BATCH-2026",
-    supplierName: supplierName || "Pengedar Sah Rasmi",
-    status: "in_stock" as const,
-    scannedCount: 0,
-    lastScannedAt: null,
-    installedWorkOrderId: null,
-    createdAt: now,
-  };
-
-  await db.insert(productSerials).values(newSerial);
-
-  return c.json({ success: true, serial: newSerial }, 201);
+  const body = c.req.valid("json");
+  const serial = await inventory.registerSerial(id, body);
+  return c.json({ success: true, serial }, 201);
 });
 

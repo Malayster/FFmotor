@@ -12,6 +12,10 @@ export const products = sqliteTable("products", {
   stockQty: integer("stock_qty").notNull().default(0),
   minAlertQty: integer("min_alert_qty").notNull().default(5),
   rackLocation: text("rack_location").notNull().default("RAK-A1"),
+  photoUrl: text("photo_url"),
+  videoUrl: text("video_url"),
+  listingStatus: text("listing_status", { enum: ["draf", "menunggu_mandor", "menunggu_foreman", "menunggu_harga", "dijual"] }).notNull().default("draf"),
+  listingNote: text("listing_note"),
   isHighValue: integer("is_high_value", { mode: "boolean" }).notNull().default(false), // perlukan serial check
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),

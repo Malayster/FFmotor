@@ -52,6 +52,32 @@ salesRouter.post("/motorcycles", async (c) => {
   return c.json({ success: true, motorcycle: newBike }, 201);
 });
 
+// Kemaskini maklumat motosikal (Harga Jualan, Harga Kos, Nota, Warna, Status)
+const updateMotorcycleHandler = async (c: any) => {
+  const db = createDb(c.env.DB);
+  const id = c.req.param("id");
+  const body = await c.req.json();
+
+  const bikeList = await db.select().from(motorcycles).where(eq(motorcycles.id, id)).all();
+  const bike = bikeList[0];
+  if (!bike) return c.json({ success: false, message: "Motosikal tidak dijumpai" }, 404);
+
+  const updateData: any = {};
+  if (body.sellingPrice !== undefined) updateData.sellingPrice = parseFloat(body.sellingPrice) || 0;
+  if (body.costPrice !== undefined) updateData.costPrice = parseFloat(body.costPrice) || 0;
+  if (body.color !== undefined) updateData.color = body.color;
+  if (body.notes !== undefined) updateData.notes = body.notes;
+  if (body.status !== undefined) updateData.status = body.status;
+
+  await db.update(motorcycles).set(updateData).where(eq(motorcycles.id, id));
+
+  return c.json({ success: true, message: "Maklumat motosikal berjaya dikemaskini" });
+};
+
+salesRouter.patch("/motorcycles/:id", updateMotorcycleHandler);
+salesRouter.put("/motorcycles/:id", updateMotorcycleHandler);
+
+
 // Rekod Jualan Motosikal
 salesRouter.post("/sell", async (c) => {
   const db = createDb(c.env.DB);

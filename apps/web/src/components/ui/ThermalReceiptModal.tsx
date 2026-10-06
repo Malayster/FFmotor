@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Printer, X, QrCode } from "lucide-react";
 import { WorkOrder } from "../../types";
 
@@ -7,6 +7,7 @@ interface ThermalReceiptModalProps {
   onClose: () => void;
   workOrder: WorkOrder;
   type: "jobcard" | "receipt";
+  items?: any[];
 }
 
 export const ThermalReceiptModal: React.FC<ThermalReceiptModalProps> = ({
@@ -14,7 +15,27 @@ export const ThermalReceiptModal: React.FC<ThermalReceiptModalProps> = ({
   onClose,
   workOrder,
   type,
+  items: initialItems,
 }) => {
+  const [receiptItems, setReceiptItems] = useState<any[]>(initialItems || []);
+
+  useEffect(() => {
+    if (initialItems && initialItems.length > 0) {
+      setReceiptItems(initialItems);
+      return;
+    }
+    if (isOpen && workOrder?.id) {
+      fetch(`/api/work-orders/${workOrder.id}/items`)
+        .then((res) => res.json())
+        .then((d) => {
+          if (d.success && d.items) {
+            setReceiptItems(d.items);
+          }
+        })
+        .catch(() => null);
+    }
+  }, [isOpen, workOrder?.id, initialItems]);
+
   if (!isOpen) return null;
 
   const currentHost = typeof window !== "undefined" ? window.location.origin : "http://localhost:3000";
@@ -27,18 +48,18 @@ export const ThermalReceiptModal: React.FC<ThermalReceiptModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-sm w-full p-6 space-y-4 shadow-2xl">
+      <div className="bg-white border border-zinc-200 rounded-3xl max-w-sm w-full p-6 space-y-4 shadow-none">
         {/* Modal Controls */}
         <div className="flex items-center justify-between no-print">
-          <div className="flex items-center space-x-2 text-brand-400">
+          <div className="flex items-center space-x-2 text-red-600">
             <Printer className="w-5 h-5" />
-            <h3 className="text-base font-extrabold text-white">
-              {type === "jobcard" ? "Cetak Slip Job Card" : "Cetak Resit Bayaran"} (80mm)
+            <h3 className="text-base font-extrabold text-zinc-900">
+              {type === "jobcard" ? "Cetak Slip Kad Kerja" : "Cetak Resit Bayaran"} (80mm)
             </h3>
           </div>
           <button
             onClick={onClose}
-            className="p-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white"
+            className="p-1.5 rounded-lg bg-zinc-100 hover:bg-zinc-200 text-zinc-600 hover:text-black transition"
           >
             <X className="w-5 h-5" />
           </button>
@@ -95,16 +116,48 @@ export const ThermalReceiptModal: React.FC<ThermalReceiptModalProps> = ({
             <p className="italic text-gray-800">{workOrder.customerComplaint}</p>
           </div>
 
+          {/* Senarai Pecahan Item & Upah Kerja */}
+          {receiptItems.length > 0 && (
+            <div className="space-y-1 text-[10px] pb-2 border-b border-dashed border-gray-300">
+              <div className="font-bold flex justify-between text-gray-900 border-b border-gray-200 pb-0.5">
+                <span>Perincian Item / Upah</span>
+                <span>Jumlah (RM)</span>
+              </div>
+              {receiptItems.map((item, idx) => (
+                <div key={item.id || idx} className="flex justify-between items-start text-[9.5px]">
+                  <span className="truncate pr-1 max-w-[190px]">
+                    {item.quantity > 1 ? `${item.quantity}x ` : ""}{item.description}
+                  </span>
+                  <span className="font-mono font-bold shrink-0">
+                    {(item.totalPrice || item.unitPrice * item.quantity).toFixed(2)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+
           {/* Financial summary for receipt */}
           {type === "receipt" && (
             <div className="space-y-1 text-[11px] pt-1 pb-2 border-b border-dashed border-gray-400">
-              <div className="flex justify-between font-extrabold text-sm">
-                <span>JUMLAH:</span>
-                <span>RM {(workOrder.grandTotal || 0).toFixed(2)}</span>
+              {workOrder.totalPartsAmount ? (
+                <div className="flex justify-between text-[10px] text-gray-600">
+                  <span>Alat Ganti:</span>
+                  <span className="font-mono">RM {workOrder.totalPartsAmount.toFixed(2)}</span>
+                </div>
+              ) : null}
+              {workOrder.totalLaborAmount ? (
+                <div className="flex justify-between text-[10px] text-gray-600">
+                  <span>Upah Kerja:</span>
+                  <span className="font-mono">RM {workOrder.totalLaborAmount.toFixed(2)}</span>
+                </div>
+              ) : null}
+              <div className="flex justify-between font-extrabold text-sm pt-0.5">
+                <span>JUMLAH BESAR:</span>
+                <span className="font-mono">RM {(workOrder.grandTotal || 0).toFixed(2)}</span>
               </div>
               <div className="flex justify-between text-[10px] text-gray-700">
                 <span>Status Bayaran:</span>
-                <span className="font-bold uppercase">{workOrder.paymentStatus}</span>
+                <span className="font-bold uppercase text-emerald-800">{workOrder.paymentStatus}</span>
               </div>
             </div>
           )}
@@ -116,11 +169,11 @@ export const ThermalReceiptModal: React.FC<ThermalReceiptModalProps> = ({
               alt="QR Code Imbas Status"
               className="w-28 h-28 mx-auto border border-gray-300 rounded p-1 bg-white"
             />
-            <p className="text-[9px] font-bold text-gray-800">
-              IMBAS UNTUK STATUS LIVE & VIDEO BUKTI
+            <p className="text-[9px] font-black text-gray-800">
+              IMBAS UNTUK STATUS LIVE & PASPORT MOTOR
             </p>
             <p className="text-[8px] text-gray-500">
-              atau semak Sijil Kesihatan Motor anda
+              Sijil Kesihatan & Rekod Rasmi FFmotor
             </p>
           </div>
 
@@ -135,13 +188,13 @@ export const ThermalReceiptModal: React.FC<ThermalReceiptModalProps> = ({
         <div className="flex space-x-2 pt-2 no-print">
           <button
             onClick={onClose}
-            className="flex-1 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold"
+            className="flex-1 py-2.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-800 text-xs font-bold transition border border-zinc-200"
           >
             Tutup
           </button>
           <button
             onClick={handlePrint}
-            className="flex-1 py-2.5 rounded-xl bg-brand-500 hover:bg-brand-600 text-white text-xs font-black shadow-lg shadow-brand-500/30 flex items-center justify-center space-x-2"
+            className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-black shadow-lg shadow-red-600/30 flex items-center justify-center space-x-2 transition"
           >
             <Printer className="w-4 h-4" />
             <span>Cetak Resit Sekarang</span>

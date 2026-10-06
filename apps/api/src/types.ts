@@ -1,3 +1,5 @@
+/// <reference types="@cloudflare/workers-types" />
+
 export type Bindings = {
   DB: D1Database;
   BUCKET: R2Bucket;
@@ -8,7 +10,7 @@ export type Variables = {
   user?: {
     id: string;
     name: string;
-    role: "admin" | "cashier" | "mechanic" | "sales";
+    role: string;
   };
 };
 

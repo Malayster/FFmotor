@@ -65,7 +65,14 @@ vehiclesRouter.post("/", async (c) => {
   const plateNorm = plateNumber.toUpperCase().replace(/\s+/g, "");
   const existing = await db.select().from(vehicles).where(eq(vehicles.plateNormalized, plateNorm)).all();
   if (existing.length > 0) {
-    return c.json({ success: false, message: "No plat ini sudah berdaftar dalam sistem" }, 400);
+    const veh = existing[0];
+    const updateData: any = { updatedAt: new Date().toISOString() };
+    if (ownerName) updateData.ownerName = ownerName;
+    if (ownerPhone) updateData.ownerPhone = ownerPhone;
+    if (currentMileage) updateData.currentMileage = parseInt(currentMileage);
+    await db.update(vehicles).set(updateData).where(eq(vehicles.id, veh.id));
+    const refreshed = await db.select().from(vehicles).where(eq(vehicles.id, veh.id)).all();
+    return c.json({ success: true, vehicle: refreshed[0] || veh, existing: true });
   }
 
   const now = new Date().toISOString();

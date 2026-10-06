@@ -3,14 +3,18 @@
   "version": "1.0.0",
   "main": "./src/index.ts",
   "scripts": {
+    "build": "tsc --noEmit",
     "dev": "XDG_CONFIG_HOME=../../.wrangler_home wrangler dev --port 8787 --ip 0.0.0.0 --inspector-port 0",
     "deploy": "wrangler deploy"
   },
   "dependencies": {
     "@ffmotor/db": "workspace:*",
+    "@hono/zod-validator": "^0.9.1",
+    "@scalar/hono-api-reference": "^0.12.3",
     "drizzle-orm": "^0.38.3",
     "hono": "^4.6.14",
-    "nanoid": "^5.0.9"
+    "nanoid": "^5.0.9",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20250109.0",
@@ -18,4 +22,3 @@
     "wrangler": "^3.109.2"
   }
 }
-

@@ -6,8 +6,7 @@
     "strict": true,
     "declaration": true,
     "declarationMap": true,
-    "skipLibCheck": true,
-    "types": ["@cloudflare/workers-types"]
+    "skipLibCheck": true
   },
   "include": ["src/**/*"]
 }
