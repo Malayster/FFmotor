@@ -211,16 +211,24 @@ export const PhotoStudio: React.FC<{ role: "kerani_1" | "kerani_2" | "foreman" }
                       {(role !== "foreman" || current.subjectType === "service") ? (
                         <div className="flex gap-1">
                           {!shot && (
-                            <label className="bg-red-600 text-white text-[11px] font-bold rounded-lg px-2 py-1 cursor-pointer">
-                              Tambah
-                              <input className="hidden" type="file" accept="image/*" onChange={(e) => { const file = e.target.files?.[0]; if (file) upload(slot, file); }} />
-                            </label>
+                            <>
+                              <label className="bg-red-600 text-white text-[11px] font-bold rounded-lg px-2 py-1 cursor-pointer flex items-center gap-1 text-center leading-tight">
+                                Kamera
+                                <input className="hidden" type="file" accept="image/*" capture="environment" onChange={(e) => { const file = e.target.files?.[0]; if (file) upload(slot, file); }} />
+                              </label>
+                              <label className="bg-zinc-100 text-zinc-800 border border-zinc-300 text-[11px] font-bold rounded-lg px-2 py-1 cursor-pointer flex items-center gap-1 text-center leading-tight">
+                                Galeri
+                                <input className="hidden" type="file" accept="image/*" onChange={(e) => { const file = e.target.files?.[0]; if (file) upload(slot, file); }} />
+                              </label>
+                            </>
                           )}
                           {shot && (
-                            <label className="bg-zinc-950 text-white text-[11px] font-bold rounded-lg px-2 py-1 cursor-pointer">
-                              Edit
-                              <input className="hidden" type="file" accept="image/*" onChange={(e) => { const file = e.target.files?.[0]; if (file) upload(slot, file); }} />
-                            </label>
+                            <>
+                              <label className="bg-zinc-950 text-white text-[11px] font-bold rounded-lg px-2 py-1 cursor-pointer flex items-center gap-1 text-center leading-tight">
+                                Edit (Kamera)
+                                <input className="hidden" type="file" accept="image/*" capture="environment" onChange={(e) => { const file = e.target.files?.[0]; if (file) upload(slot, file); }} />
+                              </label>
+                            </>
                           )}
                           {shot && <button type="button" className="text-[11px] font-bold text-red-700 px-2 py-1" onClick={() => removeShot(shot.id)}>Buang</button>}
                         </div>

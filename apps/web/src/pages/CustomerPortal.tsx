@@ -198,14 +198,24 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={() => onOpenPassport(currentVehicle.plateNumber)}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-500 text-white text-xs font-bold transition shadow-lg shadow-brand-500/20 self-start sm:self-auto"
-          >
-            <QrCode className="w-4 h-4" />
-            <span>Buka Pasport Digital</span>
-          </button>
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+            <button
+              type="button"
+              onClick={() => onOpenPassport(currentVehicle.plateNumber)}
+              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-500 text-white text-xs font-bold transition shadow-lg shadow-brand-500/20 w-full sm:w-auto"
+            >
+              <QrCode className="w-4 h-4" />
+              <span>Buka Pasport Digital</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => onOpenPassport(currentVehicle.plateNumber)}
+              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-zinc-300 hover:bg-zinc-50 text-zinc-800 text-xs font-bold transition w-full sm:w-auto"
+            >
+              <Wrench className="w-4 h-4" />
+              <span>Lihat Sejarah Servis</span>
+            </button>
+          </div>
         </div>
       </div>
 

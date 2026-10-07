@@ -1257,23 +1257,43 @@ export const WorkOrders: React.FC<WorkOrdersProps> = ({
                   {photoDataUrl && <span className="text-[10px] text-emerald-400 font-bold">✓ Foto Dimuat Naik</span>}
                 </label>
                 <div className="flex items-center gap-3">
-                  <label className="flex-1 cursor-pointer flex items-center justify-center gap-2 px-3 py-3 rounded-xl border border-dashed border-zinc-300 bg-zinc-50/70 hover:bg-zinc-50 hover:border-red-600 text-zinc-600 text-xs font-medium transition">
-                    <Camera className="w-4 h-4 text-red-600" />
-                    <span>Tangkap Gambar / Pilih Fail</span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) {
-                          const reader = new FileReader();
-                          reader.onload = (ev) => setPhotoDataUrl(ev.target?.result as string);
-                          reader.readAsDataURL(file);
-                        }
-                      }}
-                    />
-                  </label>
+                  <div className="flex gap-2">
+                    <label className="flex-1 cursor-pointer flex flex-col items-center justify-center gap-2 p-4 rounded-xl border border-dashed border-zinc-300 bg-zinc-50/70 hover:bg-zinc-50 hover:border-red-600 text-zinc-600 text-xs font-medium transition">
+                      <Camera className="w-6 h-6 text-red-600" />
+                      <span className="font-bold text-center">Tangkap Gambar<br/>(Kamera Telefon)</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            const reader = new FileReader();
+                            reader.onload = (ev) => setPhotoDataUrl(ev.target?.result as string);
+                            reader.readAsDataURL(file);
+                          }
+                        }}
+                      />
+                    </label>
+
+                    <label className="flex-1 cursor-pointer flex flex-col items-center justify-center gap-2 p-4 rounded-xl border border-zinc-300 bg-zinc-100 hover:bg-zinc-200 text-zinc-600 text-xs font-medium transition">
+                      <span className="font-bold text-center">Pilih Dari Galeri<br/>(Upload Foto)</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            const reader = new FileReader();
+                            reader.onload = (ev) => setPhotoDataUrl(ev.target?.result as string);
+                            reader.readAsDataURL(file);
+                          }
+                        }}
+                      />
+                    </label>
+                  </div>
                   {photoDataUrl && (
                     <div className="relative w-14 h-14 rounded-xl overflow-hidden border border-zinc-300 shrink-0">
                       <img src={photoDataUrl} alt="Preview Bukti" className="w-full h-full object-cover" />
