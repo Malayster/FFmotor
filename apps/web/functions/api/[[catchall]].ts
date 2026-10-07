@@ -31,7 +31,7 @@ export const onRequest: PagesFunction = async (context) => {
     responseHeaders.set("access-control-allow-origin", "*");
     responseHeaders.set(
       "access-control-allow-headers",
-      "Content-Type, Authorization, x-ff-user-id"
+      "Content-Type, Authorization, x-ff-user-id, x-ff-user-role"
     );
     responseHeaders.set(
       "access-control-allow-methods",
