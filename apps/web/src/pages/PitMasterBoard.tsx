@@ -462,27 +462,57 @@ export const PitMasterBoard: React.FC<PitMasterBoardProps> = ({
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {workOrders
             .filter((w) => w.status === "pending")
-            .slice(0, 3)
+            .slice(0, 6)
             .map((w, idx) => (
-              <div key={w.id} className="p-3 rounded-xl bg-zinc-50 border border-zinc-200 flex items-center justify-between">
-                <div className="space-y-0.5 min-w-0 pr-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-bold text-brand-400 bg-brand-500/10 px-1.5 py-0.5 rounded">
-                      #{idx + 1}
-                    </span>
-                    <span className="font-mono text-xs font-bold text-zinc-900">{w.plateNumber}</span>
+              <div key={w.id} className="p-3 rounded-xl bg-zinc-50 border border-zinc-200 flex flex-col justify-between gap-3">
+                <div className="flex items-start justify-between">
+                  <div className="space-y-0.5 min-w-0 pr-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-bold text-brand-400 bg-brand-500/10 px-1.5 py-0.5 rounded">
+                        #{idx + 1}
+                      </span>
+                      <span className="font-mono text-xs font-bold text-zinc-900">{w.plateNumber}</span>
+                    </div>
+                    <p className="text-xs text-zinc-600 font-medium truncate">
+                      {w.brand} {w.model}
+                    </p>
+                    <p className="text-[10px] text-zinc-500 truncate">
+                      Aduan: {w.customerComplaint || "Servis standard"}
+                    </p>
                   </div>
-                  <p className="text-xs text-zinc-600 font-medium truncate">
-                    {w.brand} {w.model}
-                  </p>
-                  <p className="text-[10px] text-zinc-500 truncate">
-                    Aduan: {w.customerComplaint || "Servis standard"}
-                  </p>
+                  <span className="font-mono text-xs font-bold text-brand-400 shrink-0">
+                    RM {(w.grandTotal || 0).toFixed(2)}
+                  </span>
                 </div>
 
-                <span className="font-mono text-xs font-bold text-brand-400 shrink-0">
-                  RM {(w.grandTotal || 0).toFixed(2)}
-                </span>
+                <div className="border-t border-zinc-200 pt-2 flex flex-wrap gap-1.5">
+                  <span className="text-[10px] font-bold text-zinc-500 w-full mb-0.5">MASUKKAN KE LIF:</span>
+                  {[1, 2, 3, 4].map((bayNum) => (
+                    <button
+                      key={bayNum}
+                      type="button"
+                      disabled={completingId === w.id}
+                      onClick={async () => {
+                        setCompletingId(w.id);
+                        try {
+                          const res = await fetch(`/api/work-orders/${w.id}/status`, {
+                            method: "PATCH",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ status: "in_progress", mechanicNotes: `Bay #${bayNum}` }),
+                          });
+                          if (res.ok) onRefresh();
+                        } catch (err) {
+                          alert("Ralat mengagihkan motor: " + err);
+                        } finally {
+                          setCompletingId(null);
+                        }
+                      }}
+                      className="flex-1 py-1.5 px-2 bg-white hover:bg-red-50 hover:text-red-600 border border-zinc-300 hover:border-red-300 text-zinc-700 rounded-lg text-[10px] font-black transition cursor-pointer disabled:opacity-50"
+                    >
+                      Bay {bayNum}
+                    </button>
+                  ))}
+                </div>
               </div>
             ))}
         </div>
