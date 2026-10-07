@@ -48,8 +48,6 @@ import { tacticalAudio, tactileAudio } from "./lib/audio";
 import { sessionHeader } from "./lib/api";
 
 import { WorkOrder, Product, Vehicle, Motorcycle, Lead } from "./types";
-import { MenuStation } from "./pages/MenuStation";
-import { FormModules } from "./pages/FormModules";
 import { ForemanJob } from "./pages/ForemanJob";
 
 const DEFAULT_USER: AuthenticatedUser = {
@@ -499,8 +497,6 @@ export const App: React.FC = () => {
 
         {/* Bekas Halaman Dinamik */}
         <main className="flex-1 w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <MenuStation tab={activeTab} />
-          <FormModules tab={activeTab} />
           {!isTabAllowed(currentUser.role, activeTab) ? (
             <Unauthorized />
           ) : (
