@@ -148,9 +148,6 @@ export const ExpressIntake: React.FC<ExpressIntakeProps> = ({
 
       setGeneratedTicket(woData);
       setIntakeCompleted(true);
-      if (createdWO.id) {
-        onIntakeSuccess(createdWO.id, woData.token);
-      }
       onRefresh?.();
     } catch (err) {
       // Fallback
@@ -271,11 +268,22 @@ export const ExpressIntake: React.FC<ExpressIntakeProps> = ({
             <button
               type="button"
               onClick={() => onIntakeSuccess(generatedTicket.token, generatedTicket.token)}
-              className="bg-red-600 hover:bg-red-700 text-white font-black py-3.5 px-5 rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg shadow-red-600/20 transition"
+              className="bg-red-600 hover:bg-red-700 text-white font-black py-3.5 px-5 rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg shadow-red-600/20 transition cursor-pointer"
             >
               <Wrench className="w-4 h-4" />
               <span>Buka Live Track Motor ➔</span>
             </button>
+
+            {onCancel && (
+              <button
+                type="button"
+                onClick={onCancel}
+                className="bg-zinc-950 hover:bg-zinc-800 text-white font-black py-3.5 px-5 rounded-xl text-xs flex items-center justify-center gap-2 transition cursor-pointer"
+              >
+                <ClipboardList className="w-4 h-4 text-red-500" />
+                <span>Lihat Senarai Kad Kerja (WO)</span>
+              </button>
+            )}
 
             <button
               type="button"

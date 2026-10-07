@@ -34,7 +34,7 @@ export class SalesService {
         salespersonName: users.name,
       })
       .from(loanApplications)
-      .innerJoin(motorcycles, eq(loanApplications.motorcycleId, motorcycles.id))
+      .leftJoin(motorcycles, eq(loanApplications.motorcycleId, motorcycles.id))
       .leftJoin(users, eq(loanApplications.salespersonId, users.id))
       .orderBy(desc(loanApplications.createdAt))
       .all();

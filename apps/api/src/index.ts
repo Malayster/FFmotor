@@ -72,14 +72,16 @@ app.get(
 );
 
 // 5. Health Check & Seed Data
-app.get("/api/health", (c) => {
+const healthHandler = (c: any) => {
   return c.json({
     status: "ok",
     service: "FFmotor Cloudflare Edge API v2 (Type-Safe RPC)",
     architecture: "Hono RPC + Zod OpenAPI + Clean Services",
     time: new Date().toISOString(),
   });
-});
+};
+app.get("/health", healthHandler);
+app.get("/api/health", healthHandler);
 
 app.get("/api/seed", async (c) => {
   const db = createDb(c.env.DB);

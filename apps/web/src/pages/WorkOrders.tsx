@@ -201,7 +201,12 @@ export const WorkOrders: React.FC<WorkOrdersProps> = ({
         method: "POST",
         headers: { "Content-Type": "application/json", ...sessionHeader() },
         body: JSON.stringify({
-          vehicleId: vehId,
+          plateNumber: newPlate.toUpperCase().trim(),
+          ownerName: newOwner || "Pelanggan Walk-in",
+          ownerPhone: newPhone || "0123456789",
+          brand: "Yamaha",
+          model: newModel || "Motosikal",
+          vehicleId: vehId || undefined,
           mechanicId: "usr_mech1",
           mileageIn: newMileage ? parseInt(newMileage) : 0,
           customerComplaint: newComplaint,
@@ -210,14 +215,19 @@ export const WorkOrders: React.FC<WorkOrdersProps> = ({
         }),
       });
 
+      const dataWO = await resWO.json().catch(() => ({}));
+      if (!resWO.ok || dataWO.success === false) {
+        throw new Error(dataWO.message || "Gagal membuka pesanan kerja.");
+      }
+
       setIsNewModalOpen(false);
       setNewPlate("");
       setNewComplaint("");
       setNewSafetyFlags("");
       setNewKeyTag("");
-      onRefresh();
-    } catch (err) {
-      alert("Ralat mencipta work order: " + err);
+      await onRefresh();
+    } catch (err: any) {
+      alert("Ralat mencipta work order: " + (err.message || err));
     }
   };
 
@@ -537,7 +547,12 @@ export const WorkOrders: React.FC<WorkOrdersProps> = ({
         method: "POST",
         headers: { "Content-Type": "application/json", ...sessionHeader() },
         body: JSON.stringify({
-          vehicleId: vehId,
+          plateNumber: newPlate.toUpperCase().trim(),
+          ownerName: newOwner || "Pelanggan Walk-in",
+          ownerPhone: newPhone || "0123456789",
+          brand: "Yamaha",
+          model: newModel || "Motosikal Pelanggan",
+          vehicleId: vehId || undefined,
           mechanicId: "usr_mech1",
           mileageIn: newMileage ? parseInt(newMileage) : 0,
           customerComplaint: newComplaint,
@@ -545,7 +560,10 @@ export const WorkOrders: React.FC<WorkOrdersProps> = ({
           keyTag: newKeyTag,
         }),
       });
-      const dataWO = await resWO.json();
+      const dataWO = await resWO.json().catch(() => ({}));
+      if (!resWO.ok || dataWO.success === false) {
+        throw new Error(dataWO.message || "Gagal membuka pesanan kerja intake pantas.");
+      }
 
       setNewPlate("");
       setNewModel("");
@@ -555,7 +573,7 @@ export const WorkOrders: React.FC<WorkOrdersProps> = ({
       setNewComplaint("");
       setNewSafetyFlags("");
       setNewKeyTag("");
-      onRefresh();
+      await onRefresh();
 
       if (dataWO.success && dataWO.workOrder) {
         setSelectedWO(dataWO.workOrder);

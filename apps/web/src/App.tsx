@@ -45,6 +45,7 @@ import { Toaster, toast } from "sonner";
 import { useHotkeys } from "react-hotkeys-hook";
 import { CommandPalette } from "./components/ui/CommandPalette";
 import { tacticalAudio, tactileAudio } from "./lib/audio";
+import { sessionHeader } from "./lib/api";
 
 import { WorkOrder, Product, Vehicle, Motorcycle, Lead } from "./types";
 import { MenuStation } from "./pages/MenuStation";
@@ -298,9 +299,14 @@ export const App: React.FC = () => {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
     try {
-      const headers: Record<string, string> = {};
+      const headers: Record<string, string> = {
+        ...sessionHeader(),
+      };
       if (currentUser?.id) {
         headers["x-ff-user-id"] = currentUser.id;
+      }
+      if (currentUser?.role) {
+        headers["x-ff-user-role"] = currentUser.role;
       }
       const res = await fetch(url, { signal: controller.signal, headers });
       clearTimeout(timeoutId);
