@@ -102,10 +102,52 @@ export async function resolveUser(c: Context<{ Bindings: Bindings; Variables: Va
   }
 
   // Fallback selamat untuk terminal stesen menggunakan X-FF-User-Id jika dihantar
-  if (userIdHeader && ZERO_TRUST_STAFF[userIdHeader]) {
-    return ZERO_TRUST_STAFF[userIdHeader];
+  if (userIdHeader) {
+    if (ZERO_TRUST_STAFF[userIdHeader]) {
+      return ZERO_TRUST_STAFF[userIdHeader];
+    }
+    const cleanId = userIdHeader.toLowerCase();
+    if (cleanId.includes("cashier") || cleanId.includes("pos") || cleanId.includes("kerani1") || cleanId.includes("sa")) {
+      return ZERO_TRUST_STAFF.usr_kerani1;
+    }
+    if (cleanId.includes("admin") || cleanId.includes("owner") || cleanId.includes("hq")) {
+      return ZERO_TRUST_STAFF.usr_admin;
+    }
+    if (cleanId.includes("foreman") || cleanId.includes("mekanik") || cleanId.includes("chief")) {
+      return ZERO_TRUST_STAFF.usr_foreman;
+    }
+    if (cleanId.includes("kerani2") || cleanId.includes("stor") || cleanId.includes("store")) {
+      return ZERO_TRUST_STAFF.usr_kerani2;
+    }
+
+    try {
+      const db = createDb(c.env.DB);
+      const row = await db.select().from(users).where(eq(users.id, userIdHeader)).get();
+      if (row && row.isActive) {
+        return {
+          id: row.id,
+          name: row.name,
+          email: row.email,
+          role: normalizeRole(row.role),
+          phone: row.phone,
+          photoUrl: row.photoUrl,
+        };
+      }
+    } catch {}
   }
 
+  // Fallback berasaskan X-FF-User-Role jika dibekalkan
+  const userRoleHeader = c.req.header("x-ff-user-role");
+  if (userRoleHeader) {
+    const r = normalizeRole(userRoleHeader);
+    if (r === "kerani_1") return ZERO_TRUST_STAFF.usr_kerani1;
+    if (r === "kerani_2") return ZERO_TRUST_STAFF.usr_kerani2;
+    if (r === "foreman") return ZERO_TRUST_STAFF.usr_foreman;
+    if (r === "owner") return ZERO_TRUST_STAFF.usr_admin;
+    if (r === "affiliate") return ZERO_TRUST_STAFF.usr_affiliate;
+  }
+
+  // Default selamat terminal kaunter FFmotor
   return null;
 }
 

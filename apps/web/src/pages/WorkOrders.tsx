@@ -436,14 +436,39 @@ export const WorkOrders: React.FC<WorkOrdersProps> = ({
     const passportUrl = `${currentHost}/#passport-${wo.plateNumber?.replace(/\s+/g, "")}`;
 
     // Muat turun item pecahan jika belum ada dalam memori
-    let items = selectedWO?.id === wo.id ? selectedWoItems : [];
+    let items = selectedWO?.id === wo.id && selectedWoItems.length > 0 ? [...selectedWoItems] : [];
     if (items.length === 0) {
       try {
         const res = await fetch(`/api/work-orders/${wo.id}/items`, { headers: sessionHeader() });
         const d = await res.json();
-        if (d.success && d.items) items = d.items;
+        if (d.success && Array.isArray(d.items) && d.items.length > 0) {
+          items = d.items;
+        } else {
+          // Semak jika work order detail memulangkan items
+          const detailRes = await fetch(`/api/work-orders/${wo.id}`, { headers: sessionHeader() });
+          const detailData = await detailRes.json();
+          if (detailData.success && Array.isArray(detailData.items) && detailData.items.length > 0) {
+            items = detailData.items;
+          }
+        }
       } catch {
         // Teruskan jika gagal muat item
+      }
+    }
+
+    // Jika kad kerja masih tiada item pecahan dalam sistem tetapi mempunyai aduan atau anggaran kos intake
+    if (items.length === 0) {
+      const estimatedTotal = wo.grandTotal || (wo.totalPartsAmount || 0) + (wo.totalLaborAmount || 0) || 0;
+      if (estimatedTotal > 0) {
+        items = [
+          {
+            description: wo.customerComplaint ? `Pakej Baiki: ${wo.customerComplaint}` : "Diagnosis & Servis Penyelenggaraan Pit",
+            quantity: 1,
+            unitPrice: estimatedTotal,
+            totalPrice: estimatedTotal,
+            itemType: "part",
+          } as any,
+        ];
       }
     }
 
@@ -454,20 +479,14 @@ export const WorkOrders: React.FC<WorkOrdersProps> = ({
     let msg = "";
     if (kind === "ready" || wo.status === "ready") {
       msg = WhatsAppTemplates.motorReady(wo.ownerName || "Pelanggan", wo.plateNumber || "", calculatedTotal, passportUrl);
-    } else if (kind === "approval" || (wo.status !== "completed" && items.length > 0)) {
+    } else {
+      // Sebelum motor siap (pending, inspecting, in_progress, waiting_parts):
+      // Wajib hantar sebut harga alat ganti & upah berserta jumlah harga untuk kebenaran pelanggan sebelum kerja dimulakan
       msg = WhatsAppTemplates.preWorkApproval(
         wo.ownerName || "Pelanggan",
         wo.plateNumber || "",
         `${wo.brand || ""} ${wo.model || ""}`.trim(),
         wo.customerComplaint || "",
-        items,
-        calculatedTotal
-      );
-    } else {
-      msg = WhatsAppTemplates.serviceUpdate(
-        wo.ownerName || "Pelanggan",
-        wo.plateNumber || "",
-        wo.status.toUpperCase(),
         items,
         calculatedTotal
       );
@@ -987,13 +1006,24 @@ export const WorkOrders: React.FC<WorkOrdersProps> = ({
 
                           {/* Status Progression Button */}
                           {col.id === "pending" && (
-                            <button
-                              type="button"
-                              onClick={() => handleStatusChange(wo.id, "in_progress")}
-                              className="spike-btn-red text-[10px] py-1 px-2.5 font-black"
-                            >
-                              Mula ➔
-                            </button>
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => handleSendWhatsApp(wo, "approval")}
+                                className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[10px] font-black py-1 px-1.5 flex items-center gap-0.5 cursor-pointer shadow-xs"
+                                title="Hantar sebut harga alat ganti & anggaran kos ke WhatsApp untuk kelulusan pelanggan sebelum kerja dimulakan"
+                              >
+                                <MessageSquare className="w-3 h-3" />
+                                <span>Kebenaran</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleStatusChange(wo.id, "in_progress")}
+                                className="spike-btn-red text-[10px] py-1 px-2.5 font-black"
+                              >
+                                Mula ➔
+                              </button>
+                            </div>
                           )}
                           {col.id === "in_progress" && (
                             <>

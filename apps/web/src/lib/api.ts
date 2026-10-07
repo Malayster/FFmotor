@@ -11,13 +11,16 @@ export function sessionHeader(): Record<string, string> {
     }
     const raw = localStorage.getItem("ffmotor_current_user");
     if (raw) {
-      const user = JSON.parse(raw) as { id?: string };
+      const user = JSON.parse(raw) as { id?: string; role?: string };
       if (user.id) headers["X-FF-User-Id"] = user.id;
+      if (user.role) headers["X-FF-User-Role"] = user.role;
     } else {
       headers["X-FF-User-Id"] = "usr_kerani1";
+      headers["X-FF-User-Role"] = "kerani_1";
     }
   } catch {
     headers["X-FF-User-Id"] = "usr_kerani1";
+    headers["X-FF-User-Role"] = "kerani_1";
   }
   return headers;
 }

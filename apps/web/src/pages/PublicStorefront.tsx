@@ -30,13 +30,32 @@ interface PublicStorefrontProps {
   motorcycles: Motorcycle[];
   products: Product[];
   onBackToApp?: () => void;
+  onOpenPassport?: (plate: string) => void;
+  onOpenCustomerPortal?: () => void;
 }
 
 export const PublicStorefront: React.FC<PublicStorefrontProps> = ({
   motorcycles,
   products,
   onBackToApp,
+  onOpenPassport,
+  onOpenCustomerPortal,
 }) => {
+  const [passportSearchPlate, setPassportSearchPlate] = useState("");
+
+  const handleSearchPassport = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const clean = passportSearchPlate.trim().toUpperCase();
+    if (!clean) {
+      alert("Sila masukkan nombor plat motosikal (contoh: VDF 8899).");
+      return;
+    }
+    if (onOpenPassport) {
+      onOpenPassport(clean);
+    } else {
+      window.location.hash = `passport-${clean.replace(/\s+/g, "")}`;
+    }
+  };
   // Semak parameter URL untuk affiliate referral (?ref=danial)
   const urlParams = new URLSearchParams(window.location.search);
   const refCode = urlParams.get("ref") || urlParams.get("ejen") || "AFF-HQ";
@@ -376,35 +395,66 @@ Mohon reserve lif bay untuk saya. Terima kasih!`;
     <div className="min-h-screen bg-transparent text-zinc-950 font-sans selection:bg-red-600 selection:text-white">
       {yellowBag}
       {/* Top Header Rasmi Storefront */}
-      <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-zinc-200 px-4 sm:px-8 py-3.5 flex items-center justify-between shadow-none">
+      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b-2 border-zinc-950 px-4 sm:px-8 py-3 flex flex-wrap items-center justify-between gap-3 shadow-xs">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-red-50 border border-red-200 text-red-600 flex items-center justify-center font-black">
-            <Bike className="w-5 h-5 text-red-600" />
+          <div className="w-10 h-10 rounded-2xl bg-red-600 text-white flex items-center justify-center font-black shrink-0">
+            <Bike className="w-6 h-6 text-white" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-[10px] uppercase font-mono font-black px-2 py-0.5 rounded bg-red-50 text-red-600 border border-red-200">
-                SHOWROOM & KATALOG ONLINE
+              <span className="text-[10px] uppercase font-mono font-black px-2 py-0.5 rounded bg-zinc-950 text-white">
+                SHOWROOM & PUSAT 3S
               </span>
               {refCode !== "AFF-HQ" && (
-                <span className="text-[10px] font-mono text-zinc-700 bg-zinc-100 border border-zinc-300 px-2 py-0.5 rounded-full font-bold">
-                  ★ Rujukan Ejen: {refCode}
+                <span className="text-[10px] font-mono text-zinc-950 bg-zinc-100 border border-zinc-300 px-2 py-0.5 rounded-full font-bold">
+                  ★ Ejen: {refCode}
                 </span>
               )}
             </div>
-            <h1 className="text-base sm:text-lg font-black ">FFmotor 3S Showroom & Parts Store</h1>
+            <h1 className="text-base sm:text-lg font-black text-zinc-950 leading-tight">FFmotor Bengkel & Showroom</h1>
           </div>
         </div>
 
-        {onBackToApp && (
-          <button
-            type="button"
-            onClick={onBackToApp}
-            className="text-xs text-zinc-500 hover:text-red-600 px-3 py-1.5 rounded-xl border border-zinc-200 hover:bg-zinc-100 transition"
-          >
-            Kembali ke Hab
-          </button>
-        )}
+        {/* Kotak Semakan Sejarah Servis Pantas (Plan A: Frontpage Passport Search) */}
+        <div className="flex flex-wrap items-center gap-2">
+          <form onSubmit={handleSearchPassport} className="flex items-center gap-1.5 bg-zinc-50 border-2 border-zinc-950 rounded-2xl p-1">
+            <input
+              type="text"
+              value={passportSearchPlate}
+              onChange={(e) => setPassportSearchPlate(e.target.value)}
+              placeholder="No. Plat (cth: VDF 8899)"
+              className="bg-transparent px-2.5 py-1 text-xs font-mono font-black text-zinc-950 uppercase placeholder:text-zinc-600 focus:outline-none w-36 sm:w-44"
+            />
+            <button
+              type="submit"
+              className="px-3 py-1.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-black transition flex items-center gap-1 cursor-pointer"
+            >
+              <ShieldCheck className="w-3.5 h-3.5" />
+              <span>Semak Servis</span>
+            </button>
+          </form>
+
+          {onOpenCustomerPortal && (
+            <button
+              type="button"
+              onClick={onOpenCustomerPortal}
+              className="px-3.5 py-2 rounded-xl bg-zinc-950 hover:bg-zinc-800 text-white text-xs font-black transition flex items-center gap-1.5 cursor-pointer"
+            >
+              <User className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Portal Saya</span>
+            </button>
+          )}
+
+          {onBackToApp && (
+            <button
+              type="button"
+              onClick={onBackToApp}
+              className="text-xs text-zinc-800 hover:text-zinc-950 px-3 py-2 rounded-xl border-2 border-zinc-300 hover:bg-zinc-100 font-bold transition cursor-pointer"
+            >
+              Staf HQ
+            </button>
+          )}
+        </div>
       </header>
 
       {/* Hero Banner Bergambar */}
@@ -437,14 +487,31 @@ Mohon reserve lif bay untuk saya. Terima kasih!`;
             <p className="text-[11px] text-zinc-500 max-w-xs">
               Motosikal baharu JPJ & tempahan slot servis lif bengkel pantas.
             </p>
-            <button
-              type="button"
-              onClick={() => setIsSlotBookingModalOpen(true)}
-              className="bg-brand-600 hover:bg-brand-500 text-white font-black py-2.5 px-4 rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg shadow-brand-600/30 transition"
-            >
-              <Calendar className="w-4 h-4" />
-              <span>📅 Tempah Slot Servis Pit Lif</span>
-            </button>
+            <div className="flex flex-col gap-2 w-full">
+              <button
+                type="button"
+                onClick={() => setIsSlotBookingModalOpen(true)}
+                className="bg-red-600 hover:bg-red-700 text-white font-black py-2.5 px-4 rounded-xl text-xs flex items-center justify-center gap-2 shadow-sm transition cursor-pointer"
+              >
+                <Calendar className="w-4 h-4" />
+                <span>📅 Tempah Slot Servis Pit Lif</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const p = prompt("Masukkan nombor plat motosikal anda (contoh: VDF 8899):");
+                  if (p && p.trim()) {
+                    const clean = p.trim().toUpperCase();
+                    if (onOpenPassport) onOpenPassport(clean);
+                    else window.location.hash = `passport-${clean.replace(/\s+/g, "")}`;
+                  }
+                }}
+                className="bg-zinc-950 hover:bg-zinc-800 text-white font-black py-2.5 px-4 rounded-xl text-xs flex items-center justify-center gap-2 transition cursor-pointer"
+              >
+                <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                <span>🏍️ Semak Pasport Servis Digital</span>
+              </button>
+            </div>
           </div>
         </HeroDepth>
       </div>

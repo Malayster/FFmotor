@@ -151,7 +151,19 @@ export const ROLE_TABS: Record<string, string[]> = {
   ],
 };
 
+export const PUBLIC_TABS = new Set([
+  "katalog",
+  "customer-portal",
+  "passport",
+  "track",
+  "vo-view",
+  "quote-view",
+]);
+
 export const isTabAllowed = (rawRole: string, tab: string): boolean => {
+  if (PUBLIC_TABS.has(tab)) {
+    return true;
+  }
   const role = normalizeRole(rawRole);
   if (role === "owner" || role === "admin" || rawRole === "owner" || rawRole === "admin") {
     return true;
@@ -703,6 +715,8 @@ export const App: React.FC = () => {
               motorcycles={motorcycles}
               products={products}
               onBackToApp={() => setActiveTab("dashboard")}
+              onOpenPassport={openPassport}
+              onOpenCustomerPortal={() => setActiveTab("customer-portal")}
             />
           )}
         </>
