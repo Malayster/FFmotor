@@ -119,6 +119,7 @@ export const ROLE_TABS: Record<string, string[]> = {
   ],
   kerani_1: [
     "express-intake",
+    "pit-live",
     "work-orders",
     "pos-checkout",
     "quotations",

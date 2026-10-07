@@ -133,6 +133,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       items: [
         { id: "dashboard", label: "Meja Kaunter", icon: LayoutDashboard, badge: "Kaunter" },
         { id: "express-intake", label: "Daftar Masuk Kilat (30s)", icon: Zap, badge: "Masuk" },
+        { id: "pit-live", label: "Lantai Pit 4-Bay Live", icon: Flame, badge: "Pit" },
         { id: "work-orders", label: "Kad Kerja Servis", icon: Wrench, badge: "Servis" },
         { id: "pos-checkout", label: "Kasir POS & Bayaran", icon: ShoppingCart, badge: "Bayar" },
         { id: "quotations", label: "Sebut Harga Rasmi", icon: FileText, badge: "Harga" },
